@@ -208,6 +208,15 @@ const uniRecord = (over: Partial<UniverseAssetRecord> = {}): UniverseAssetRecord
   check('universe full about on api without relay: own text even for crypto', policy.fullUniverseAbout({ description: 'V', enrichment: 'OWN', source: 'coingecko', kind: 'crypto' }, 'api', off) === 'OWN');
   const ownLong = policy.ownText('word '.repeat(300));
   check('own text is clipped at a word boundary (500 chars)', !!ownLong && ownLong.length <= policy.OWN_TEXT_CHARS && ownLong.endsWith('…'));
+
+  // e2e P2-1: the own text is model output; its Markdown never reaches a card or the API.
+  const md = 'NVIDIA is the defining play on **AI infrastructure**, *sovereign AI* and ## grids, per [Reuters](https://reuters.example/a); 2**10 stays.';
+  check('own text: Markdown emphasis, links and heading markers are stripped', policy.ownText(md) === 'NVIDIA is the defining play on AI infrastructure, sovereign AI and grids, per Reuters; 2**10 stays.', String(policy.ownText(md)));
+  const mdLong = policy.ownText(`${'word '.repeat(95)}**a bold phrase that runs across the clip point** tail`);
+  check('own text: stripped before clipping, so no marker is left at the cut', !!mdLong && !mdLong.includes('*') && mdLong.endsWith('…'), mdLong?.slice(-40));
+  check('own text: the card and universe list paths are plain text', policy.presentPickData({ source: 'fmp', kind: 'stock', blurb: 'V', enrichment: '**Grid** play' }, 'web', off).about === 'Grid play' && policy.presentUniverseAsset(uniRecord({ enrichment: '**Apple** themes' }), 'web', off).about === 'Apple themes');
+  check('universe full about: the own text is plain text, vendor text untouched', policy.fullUniverseAbout({ description: 'V', enrichment: 'OWN **bold** [link](https://x.example/a)', source: 'fmp', kind: 'stock' }, 'web', off) === 'OWN bold link' && policy.fullUniverseAbout({ description: 'V **x**', enrichment: 'OWN', source: 'fmp', kind: 'stock' }, 'web', { ...off, fmp: true }) === 'V **x**');
+  check('enrichment prompt asks for plain text, so the next refresh stores no Markdown', /Plain text, no Markdown\./.test(src('ingest/enrich-descriptions.ts')));
 }
 
 // ==== universe payload: null multiplier, website normalization (L15) ==============
@@ -304,6 +313,11 @@ const cand = (over: Partial<Candidate>): Candidate =>
   check('hygiene: the analysis prompt never receives the vendor text or holdings', /OWN-TEXT grid buildout/.test(seen) && !/VENDOR-FMP-TEXT|Holding A/.test(seen));
   check('select rule: one plain instruction about the user-visible rationale', /shown to users/.test(policy.SELECT_RATIONALE_RULE) && /prices/.test(policy.SELECT_RATIONALE_RULE) && /holding weights/.test(policy.SELECT_RATIONALE_RULE) && /market caps/.test(policy.SELECT_RATIONALE_RULE));
   check('hygiene is active while any vendor flag is off', policy.promptHygieneActive(off) && policy.promptHygieneActive({ fmp: true, sacra: false, apiRelay: true }) && !policy.promptHygieneActive({ fmp: true, sacra: true, apiRelay: false }));
+  // e2e P2-4: on the API without relay rights no CoinGecko figure or text is relayed either.
+  const apiHy = { ...hy, channel: 'api' as const };
+  check('hygiene api/no relay: CoinGecko rows lose the vendor text and the size band', !/VENDOR-CG-TEXT|market cap/.test(analysisLineFor(coin, apiHy)) && /market cap/.test(pickAnalysisLine(coin)), analysisLineFor(coin, apiHy));
+  check('hygiene api with relay rights: CoinGecko rows keep their line', analysisLineFor(coin, { ...apiHy, flags: { ...off, apiRelay: true } }) === pickAnalysisLine(coin));
+  check('hygiene is active on the API without relay rights, even with both display flags on', policy.promptHygieneActive({ fmp: true, sacra: true, apiRelay: false }, 'api') && !policy.promptHygieneActive({ fmp: true, sacra: true, apiRelay: true }, 'api') && !policy.promptHygieneActive({ fmp: true, sacra: true, apiRelay: false }, 'web'));
 }
 
 // ==== end to end: performRun with the pipeline and every vendor stubbed ===========
@@ -418,8 +432,11 @@ try {
   const lineOf = (t: string) => (ana?.user.split('\n') ?? []).find((l) => l.startsWith(`${t}|`)) ?? '';
   const heldBack = ['FMPX', 'ETFX', 'PRIVX'].map(lineOf);
   check('prompt: the analysis prompt gets own text, never FMP/Sacra text, holdings or size bands', !!ana && /OWN-TEXT-FMPX/.test(lineOf('FMPX')) && heldBack.every((l) => l && !/VENDOR-|Holding Alpha|HOLDA|\$/.test(l)) && !/VENDOR-FMP|VENDOR-SACRA|Holding Alpha/.test(ana.user), heldBack.join(' / '));
-  check('prompt: CoinGecko text still reaches the analysis prompt', /VENDOR-CG-TEXT/.test(lineOf('CGX')), lineOf('CGX'));
+  // e2e P2-4: the API channel without relay rights relays no CoinGecko data, so its analysis line is hygienic too.
+  check('prompt: on the API without relay rights the CoinGecko line carries no vendor text or size band', /^CGX\|CGX Network\|crypto\|\|/.test(lineOf('CGX')) && !/VENDOR-CG-TEXT|market cap/.test(lineOf('CGX')), lineOf('CGX'));
   check('status lines never print vendor values', !a.status.some((s) => /321\.09|44\.44|123456789000|1\.75|VENDOR-/.test(s)), a.status.join(' | '));
+  // e2e P2-3: nothing is fetched on this run, so nothing says it is loading.
+  check('status: no "Loading prices" line when no pick will be fetched', !a.status.some((s) => /Loading prices/.test(s)), a.status.join(' | '));
 
   // 2) Website, everything off: CoinGecko shown (and fetched), FMP never fetched, Sacra hidden.
   const w = await runOnce('web', { fmp: false, sacra: false, apiRelay: false });
@@ -429,6 +446,10 @@ try {
   check('run web/all off: the website note is the owner\'s sentence', w.payload.market_note === NOTE_BOTH);
   check('run web/all off: CoinGecko logo kept, FMP logos dropped', String(w.byT.get('CGX')?.logo).includes('coingecko') && w.byT.get('FMPX')?.logo === null && w.byT.get('ETFX')?.logo === null);
   check('run web/all off: no Sacra valuation anywhere in the payload', !/9876000000|9\.876e9|5000000000/.test(JSON.stringify(w.payload)));
+  check('status: "Loading prices" is said when a pick is fetched (the CoinGecko one)', w.status.some((s) => /^Loading prices and 30 day history/.test(s)), w.status.join(' | '));
+  const anaW = w.prompts.find((p) => /senior investment analyst/.test(p.system));
+  const cgLineW = (anaW?.user.split('\n') ?? []).find((l) => l.startsWith('CGX|')) ?? '';
+  check('prompt: on the website CoinGecko text and its size band still reach the analysis prompt', /VENDOR-CG-TEXT/.test(cgLineW) && /market cap/.test(cgLineW), cgLineW);
 
   // 3) API with every right: everything relayed, each market object attributed.
   const r = await runOnce('api', { fmp: true, sacra: true, apiRelay: true });

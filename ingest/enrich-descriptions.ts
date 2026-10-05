@@ -28,7 +28,7 @@ const REFRESH = process.env.ENRICH_REFRESH === 'true';
 // for theses that never name it (proven: ETH moved from not-retrieved to pool
 // rank #66 / sim 0.562 on the Swift/RWA thesis when the prompt led with themes).
 const SYS =
-  'You enrich an asset profile for a semantic-search index that matches assets to investment theses. Use web search. In 3-4 dense sentences, LEAD with the specific sectors, investment themes, narratives, use-cases, and trends this asset is a play on or the infrastructure for — be exhaustive about its thematic exposures and which theses it should surface for — THEN briefly what it is. Factual and current. No preamble, no marketing fluff, no price predictions or targets.';
+  'You enrich an asset profile for a semantic-search index that matches assets to investment theses. Use web search. In 3-4 dense sentences, LEAD with the specific sectors, investment themes, narratives, use-cases, and trends this asset is a play on or the infrastructure for — be exhaustive about its thematic exposures and which theses it should surface for — THEN briefly what it is. Factual and current. Plain text, no Markdown. No preamble, no marketing fluff, no price predictions or targets.';
 
 type Row = {
   id: number;

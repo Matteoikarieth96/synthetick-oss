@@ -131,9 +131,22 @@ export function displayLogo(url: string | null | undefined, channel: Channel, fl
   return vendor && !mayShow(vendor, channel, flags) ? null : url;
 }
 
-/** The asset's own enrichment text, clipped at a word boundary, or null. */
+/** The asset's own enrichment text is model output that sometimes carries
+ * Markdown, and every surface shows it as plain text (e2e P2-1): bold and
+ * italic markers, simple [label](url) links and heading markers go, the words
+ * stay. */
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, '$1')
+    .replace(/(^|\s)#{1,6}\s+/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/(^|[\s("'\u2018\u201C])\*([^*\s][^*]*?)\*(?=[\s).,;:!?"'\u2019\u201D\u2013\u2014-]|$)/g, '$1$2')
+    .replace(/(^|[\s(])\*\*(?=\S)|(?<=\S)\*\*(?=[\s).,;:!?]|$)/g, '$1'); // half a pair the stored text cut
+}
+
+/** The asset's own enrichment text as plain text, clipped at a word boundary, or null. */
 export function ownText(enrichment: string | null | undefined, max = OWN_TEXT_CHARS): string | null {
-  const t = String(enrichment ?? '').replace(/\s+/g, ' ').trim();
+  const t = stripMarkdown(String(enrichment ?? '')).replace(/\s+/g, ' ').trim();
   return t ? clipText(t, max) : null;
 }
 
@@ -268,14 +281,14 @@ export function presentUniverseAsset(rec: UniverseAssetRecord, channel: Channel,
 }
 
 /** The single-asset endpoint's full description: the vendor text when it may
- * be shown, else the asset's own enrichment text (unclipped). */
+ * be shown, else the asset's own enrichment text (unclipped, plain text). */
 export function fullUniverseAbout(
   full: { description: string | null; enrichment: string | null; source: string | null; kind: string | null },
   channel: Channel,
   flags: DisplayFlags,
 ): string | null {
   const vendor = vendorOf({ source: full.source, kind: full.kind });
-  const text = vendorTextShown(vendor, channel, flags) ? full.description : full.enrichment;
+  const text = vendorTextShown(vendor, channel, flags) ? full.description : full.enrichment && stripMarkdown(full.enrichment);
   return text?.trim() ? text : null;
 }
 
@@ -287,9 +300,10 @@ export function presentUniverseAsOf<T extends { dex: string | null }>(asOf: T, c
 // ---- prompt hygiene (the analysis and the select rationale are shown to users) ----
 
 /** True when some vendor's data is held back, so user-visible model output
- * must not be fed (or quote) that vendor's figures and text. */
-export function promptHygieneActive(flags: DisplayFlags): boolean {
-  return !flags.fmp || !flags.sacra;
+ * must not be fed (or quote) that vendor's figures and text. An API run
+ * without relay rights holds every vendor back, CoinGecko included. */
+export function promptHygieneActive(flags: DisplayFlags, channel: Channel = 'web'): boolean {
+  return !flags.fmp || !flags.sacra || (channel === 'api' && !flags.apiRelay);
 }
 
 /** One instruction for the select prompt: its "w" rationale is shown as written. */
@@ -299,11 +313,14 @@ export const SELECT_RATIONALE_RULE =
 /** What the analysis prompt may read for one pick under hygiene. */
 export interface AnalysisHygiene {
   flags: DisplayFlags;
+  /** Who reads the analysis; absent means the website. On the API without
+   * API_RELAY_MARKET_DATA no vendor's data is relayed (e2e P2-4). */
+  channel?: Channel;
   /** assets.enrichment by asset id (the asset's own LLM text). */
   ownText: Map<number, string | null>;
 }
 
 /** Does this candidate's vendor text and size data stay out of the analysis prompt? */
 export function analysisNeedsHygiene(a: Pick<Candidate, 'kind'>, hygiene: AnalysisHygiene | null | undefined): boolean {
-  return hygiene ? !vendorTextAllowed(vendorOf({ kind: a.kind }), hygiene.flags) : false;
+  return hygiene ? !vendorTextShown(vendorOf({ kind: a.kind }), hygiene.channel ?? 'web', hygiene.flags) : false;
 }

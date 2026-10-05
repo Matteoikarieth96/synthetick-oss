@@ -394,12 +394,15 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':
 const CG_URL='https://www.coingecko.com/en/api';
 /** True when a result shows CoinGecko figures (a crypto pick with market data). */
 const showsCoinGecko=(r)=>(r?.picks||[]).some(p=>p.kind==='crypto'&&p.market);
+/** The footer's prices sentence, only when the result shows a price (the
+ * display policy can withhold every pick's market data). */
+const pricesNote=(r)=>(r?.picks||[]).some(p=>p.market)?' Prices come from external market data providers and include an as of time when available.':'';
 const fmtMoney = (v, cur) => {
-  if (v == null) return 'N/A';
+  if (v == null) return '—';
   const code = cur === 'USD' ? '$' : cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur === 'HKD' ? 'HK$' : cur + ' ';
   return code + (v >= 1000 ? v.toLocaleString('en-US', {maximumFractionDigits: 0}) : v.toLocaleString('en-US', {maximumFractionDigits: v >= 1 ? 2 : 4}));
 };
-const fmtCap = (v) => v == null ? 'N/A' : v >= 1e12 ? '$' + (v/1e12).toFixed(2) + 'T' : v >= 1e9 ? '$' + (v/1e9).toFixed(1) + 'B' : '$' + (v/1e6).toFixed(0) + 'M';
+const fmtCap = (v) => v == null ? '—' : v >= 1e12 ? '$' + (v/1e12).toFixed(2) + 'T' : v >= 1e9 ? '$' + (v/1e9).toFixed(1) + 'B' : '$' + (v/1e6).toFixed(0) + 'M';
 // Trading volumes can be small (a $100k/day coin floors to "$0M" under fmtCap), so keep the k tier.
 const fmtVol = (v) => v == null ? 'N/A' : v >= 1e9 ? '$' + (v/1e9).toFixed(1) + 'B' : v >= 1e6 ? '$' + (v/1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v/1e3).toFixed(0) + 'k' : '$' + Math.round(v);
 
@@ -710,7 +713,8 @@ function fullAnalysis(p){
   if(links) secs.push(`<div class="fa-sec"><div class="fa-lbl">Links</div>${links}</div>`);
   if(p.analysis) secs.push(`<div class="fa-sec"><div class="fa-lbl">Investment thesis</div><p>${esc(p.analysis)}</p></div>`);
   if(!secs.length) return '';
-  return `<details class="deep"><summary>Detailed analysis and financial data</summary><div class="fa-body">${secs.join('')}</div></details>`;
+  // A withheld card has no financial data to open (display policy).
+  return `<details class="deep"><summary>${p.market_withheld?'Detailed analysis':'Detailed analysis and financial data'}</summary><div class="fa-body">${secs.join('')}</div></details>`;
 }
 // Logo image fallbacks as delegated listeners instead of inline onerror/onload
 // attributes (security audit M5), so a future CSP can drop 'unsafe-inline'
@@ -1955,7 +1959,7 @@ function reportHTML(r){
     <div class="r-cover-meta">${metaBits.map((b,i)=>(i?'<span class="r-sep"></span>':'')+esc(b)).join('')}</div>
   </header>
   ${body}
-  <footer>This report is a research starting point, not a recommendation. It does not assess valuation, timing or suitability.${shortNote} Prices come from external market data providers and include an as of time when available.${showsCoinGecko(r)?` Crypto data provided by <a class="r-url" href="${CG_URL}" target="_blank" rel="noopener">CoinGecko</a> (coingecko.com/en/api).`:''} This is not financial advice.</footer>
+  <footer>This report is a research starting point, not a recommendation. It does not assess valuation, timing or suitability.${shortNote}${pricesNote(r)}${showsCoinGecko(r)?` Crypto data provided by <a class="r-url" href="${CG_URL}" target="_blank" rel="noopener">CoinGecko</a> (coingecko.com/en/api).`:''} This is not financial advice.</footer>
   </body></html>`;
 }
 // A PDF download costs 1 credit (spec §12): debit first, then print. With auth
@@ -2170,7 +2174,7 @@ function render(r){
       const longs = groupByCompany(r.picks.filter(p=>p.dir!=='short'));
       const shorts = groupByCompany(r.picks.filter(p=>p.dir==='short'));
       view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2>Long positions and short candidates</h2>
-        <div class="recap">${longs.length} long companies and ${shorts.length} short candidates across ${r.picks.length} tradable listings. Every result met the selected criteria. Prices and 30 day history come from market data providers.</div></section>`);
+        <div class="recap">${longs.length} long companies and ${shorts.length} short candidates across ${r.picks.length} tradable listings. Every result met the selected criteria.${(r?.picks||[]).some(p=>p.market)?' Prices and 30 day history come from market data providers.':''}</div></section>`);
       view.insertAdjacentHTML('beforeend', basketSummary([...longs,...shorts], dir));
       if (longs.length) {
         view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--up)">Long positions</h2></section>`);
@@ -2222,7 +2226,7 @@ function render(r){
     ? ' Short positions can produce unlimited losses and may involve borrow costs or short squeezes. This research does not model those risks.'
     : '';
   const cgNote = showsCoinGecko(r) ? ` Crypto data provided by <a href="${CG_URL}" target="_blank" rel="noopener">CoinGecko</a>.` : '';
-  view.insertAdjacentHTML('beforeend', `<footer class="block">This is a research starting point, not a recommendation. SyntheTick does not assess valuation, timing or suitability.${shortNote} Prices come from external market data providers and include an as of time when available.${cgNote} This is not financial advice.</footer>`);
+  view.insertAdjacentHTML('beforeend', `<footer class="block">This is a research starting point, not a recommendation. SyntheTick does not assess valuation, timing or suitability.${shortNote}${pricesNote(r)}${cgNote} This is not financial advice.</footer>`);
 }
 
 startBtn.addEventListener('click', async ()=>{

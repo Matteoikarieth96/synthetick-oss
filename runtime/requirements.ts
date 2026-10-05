@@ -5,6 +5,7 @@
  * region 'china'→'cn' bucket; sector_set dropped (v4 uses semantic + categories);
  * ticker lists validated against the DB downstream instead of a hand catalog.
  */
+import { clipText } from './text.js';
 
 export interface Crit {
   asset_set?: string[]; // subset of stock/etf/bond/crypto
@@ -133,7 +134,7 @@ export function offlineConstraints(text: string, instrOnly = false): Crit {
     constrained: true,
     // Semantic scope only from a real restriction (§5.1 2026-07-10): a goal
     // sentence ("I want to hedge…") is a topic, and topics never bind (§5.4).
-    constraint_note: instr && RESTRICT_RE.test(instr) ? instr.slice(0, 90) : undefined,
+    constraint_note: instr && RESTRICT_RE.test(instr) ? clipText(instr, 90) : undefined,
   };
   if (/\betfs?\b|index funds?|tracker funds?|ucits/.test(t)) aset.push('etf');
   if (/\bbonds?\b|fixed income|treasur|gilts?\b/.test(t)) aset.push('bond');
@@ -226,7 +227,7 @@ export function mergeCrit(base: Crit, extra: Crit, opts: { sameSource?: boolean 
   out.include_tickers = [...new Set([...(base.include_tickers ?? []), ...(extra.include_tickers ?? [])])];
   out.exclude_tickers = [...new Set([...(base.exclude_tickers ?? []), ...(extra.exclude_tickers ?? [])])];
   const noteBits = [out.constraint_note, extra.constraint_note].filter(Boolean) as string[];
-  if (noteBits.length) out.constraint_note = [...new Set(noteBits)].join(' · ').slice(0, 180);
+  if (noteBits.length) out.constraint_note = clipText([...new Set(noteBits)].join(' · '), 180);
   if (extra.constrained) out.constrained = true;
   return out;
 }

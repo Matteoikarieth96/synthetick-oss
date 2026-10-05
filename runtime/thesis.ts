@@ -20,6 +20,7 @@ import {
   normalizeCapClass,
   type Crit,
 } from './requirements.js';
+import { clipText } from './text.js';
 
 export interface Thesis {
   title: string;
@@ -432,7 +433,7 @@ export async function buildThesis(text: string, opts: BuildThesisOptions = {}): 
     region_set: regionSet(rq.regions),
     cap_set: [...new Set(rq.caps.map(normalizeCapClass).filter(Boolean))],
     exclusions_set: rq.exclude.map((v) => v.toLowerCase()).filter((v) => ['defense', 'micro', 'stableyield'].includes(v)),
-    constraint_note: rq.semantic ? rq.semantic.slice(0, 90) : undefined,
+    constraint_note: rq.semantic ? clipText(rq.semantic, 90) : undefined,
     constrained: true,
   };
   // Dual-extractor union (v3 line 1310): deterministic regex on the document's

@@ -37,10 +37,7 @@
     "runtime/**/*.ts",
     "server/**/*.ts",
     "bot/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".next-alt2/dev/types/**/*.ts",
-    ".next-alt/dev/types/**/*.ts",
-    ".next-beta/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

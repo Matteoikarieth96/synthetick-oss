@@ -77,6 +77,7 @@ import { xLinkConfigured, beginLink, completeLink, getXAccount, unlinkXAccount }
 import { executeRunSSE, buildScreenInput, abortWhenClientGone } from './run.js';
 import { RunAbortedError, withRunSignal } from '../runtime/runsignal.js';
 import { selectAllPages } from './paging.js';
+import { clipText } from '../runtime/text.js';
 import { fullAbout, isUniverseName, onchainChart, startUniverseWarmer, universeAssetData, universeDataAsOf, UNIVERSES } from '../runtime/universe.js';
 import {
   ATTRIBUTION,
@@ -494,7 +495,7 @@ async function handleComplete(req: http.IncomingMessage, res: http.ServerRespons
   const extraReq = (body.extraReq ?? '').trim();
   if (extraReq.length > 2) {
     const box = offlineConstraints(extraReq);
-    box.constraint_note = box.constraint_note ?? extraReq.slice(0, 140); // compliance enforces verbatim
+    box.constraint_note = box.constraint_note ?? clipText(extraReq, 140); // compliance enforces verbatim
     crit = mergeCrit(crit, box);
   }
   // Review-card selectors (spec §6): binding, merged after the box so an
@@ -1274,12 +1275,19 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse, url: U
 
   if (path === '/mcp') {
     if (method === 'OPTIONS') {
-      res.writeHead(204, { allow: 'GET, POST, DELETE, OPTIONS' });
+      res.writeHead(204, { allow: 'POST, OPTIONS' });
       return void res.end();
+    }
+    // The transport is stateless (server/mcp.ts): no session, so no standalone
+    // SSE stream for GET (it held the connection open with nothing to send,
+    // e2e E8) and nothing for DELETE to end. The MCP spec allows a 405 here.
+    if (method !== 'POST') {
+      res.writeHead(405, { 'content-type': 'application/json', allow: 'POST, OPTIONS' });
+      return void res.end(JSON.stringify({ error: 'Method not allowed.', code: 'method_not_allowed' }));
     }
     ipBudget(req, path);
     normalizeJsonContentType(req); // lenient like /v1 (e2e R5); forms and multipart are a 415
-    // Same key auth as /v1; the transport itself answers non-POST methods.
+    // Same key auth as /v1.
     const mcpUser = await v1User(req, res);
     if (mcpUser === undefined) return;
     return handleMcp(req, res, mcpUser);

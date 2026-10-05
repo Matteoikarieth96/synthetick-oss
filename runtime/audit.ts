@@ -11,6 +11,7 @@ import type { Crit } from './requirements.js';
 import { fundMatchesRegions } from './fundgeo.js';
 import { sizeBand, type Candidate } from './candidates.js';
 import type { Pick } from './select.js';
+import { clipText } from './text.js';
 
 /** v4 passesFilters: a DB-backed candidate vs the requirement object. */
 export function passesFilters(a: Candidate, crit: Crit | null | undefined): boolean {
@@ -164,7 +165,7 @@ export function filterViolations(
       discarded.push(`${t}(already enforced: ${why.slice(0, 40)})`);
       continue;
     }
-    drop[t] = (why || 'violates your instructions').slice(0, 60);
+    drop[t] = clipText(why, 60) || 'violates your instructions';
   }
   return { drop, discarded };
 }

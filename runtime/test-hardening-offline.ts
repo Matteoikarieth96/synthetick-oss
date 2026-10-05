@@ -105,6 +105,21 @@ const pa = parseAnalysis(JSON.stringify({ FHYS: longAnalysis }), [pick('FHYS')])
 check('parseAnalysis: an over-long analysis is clipped at a word boundary', pa.length <= 800 && pa.endsWith('…') && !/maxi…$/.test(pa), pa.slice(-40));
 const fb = fallbackAnalysis([pick('FHYS', 'x '.repeat(10) + 'income maximization '.repeat(20))])['FHYS'] ?? '';
 check('fallbackAnalysis: no mid-word cut, no "…." double stop', !/maxi\.$/.test(fb) && !fb.endsWith('….'), fb.slice(-30));
+// e2e E6: the constraint note (quoted in the PDF criteria) and the audit's drop
+// reason (a status line) end on a whole word.
+const atWordEnd = (full: string, cut: string) => {
+  const body = cut.replace(/…$/, '');
+  return cut.endsWith('…') && full.startsWith(body) && /[\s,;:.]/.test(full[body.length] ?? ' ');
+};
+const restriction = 'Only crypto related to the Ethereum ecosystem, specifically ETH-native protocols and nothing merely bridged.';
+const restrictionNote = off(restriction).constraint_note ?? '';
+check('E6 offline constraint note: clipped at a word boundary', restrictionNote.length <= 90 && atWordEnd(restriction, restrictionNote), restrictionNote);
+const { filterViolations } = await import('./audit.js');
+const ecoScope = { constraint_note: 'only crypto related to the Ethereum ecosystem' };
+const longWhy = 'outside the Ethereum ecosystem: not clearly Ethereum-native staking protocol infrastructure';
+const dropWhy = filterViolations([{ t: 'ARB', c: 'semantic', why: longWhy }], ecoScope, new Set(['ARB'])).drop.ARB ?? '';
+check('E6 audit drop reason: clipped at a word boundary', dropWhy.length <= 60 && atWordEnd(longWhy, dropWhy), dropWhy);
+check('E6 audit: a blank reason still drops the pick, with the default text', filterViolations([{ t: 'ARB', c: 'semantic', why: '   ' }], ecoScope, new Set(['ARB'])).drop.ARB === 'violates your instructions');
 
 // ---- R1: one pool row per ticker; market data keyed by source + vendor id -----
 const cand = (id: number, ticker: string, kind: string, sim: number): Candidate =>
@@ -399,6 +414,22 @@ try {
   globalThis.fetch = realFetch;
   sb.rpc = realRpc;
   sb.from = realFrom;
+}
+
+// ---- E6: the thesis extractor's semantic scope is clipped at a word boundary ----
+{
+  const semantic = 'only crypto related to the Ethereum ecosystem, specifically ETH-native protocols rather than bridged tokens';
+  const reply = { title: 'Eth', stance: 'bullish', summary: 'Ethereum-native protocols will capture value.', intent: 'thematic', direction: 'long', anchors: [], private_entities: [], avoid: [], themes: ['ethereum'], strategies: [], requirements: { semantic } };
+  globalThis.fetch = (async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(reply) } }] }), { status: 200 })) as typeof fetch;
+  sb.from = tableClient(() => []);
+  try {
+    const { buildThesis } = await import('./thesis.js');
+    const note = (await buildThesis('Ethereum-native protocols will capture value.')).docCrit.constraint_note ?? '';
+    check('E6 thesis constraint note: clipped at a word boundary', note.length <= 90 && atWordEnd(semantic, note), note);
+  } finally {
+    globalThis.fetch = realFetch;
+    sb.from = realFrom;
+  }
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED');

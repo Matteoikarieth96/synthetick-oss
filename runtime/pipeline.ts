@@ -4,7 +4,7 @@
  */
 import { log } from '../ingest/lib/log.js';
 import { supabase } from '../ingest/lib/supabase.js';
-import { analysisNeedsHygiene, displayFlags, promptHygieneActive, type AnalysisHygiene } from './display-policy.js';
+import { analysisNeedsHygiene, displayFlags, promptHygieneActive, type AnalysisHygiene, type Channel } from './display-policy.js';
 import { getCandidates, ensureAnchors, type Requirements, type Candidate } from './candidates.js';
 import { universeCandidates, UNIVERSES, type UniverseName } from './universe.js';
 import { passesFilters } from './audit.js';
@@ -64,6 +64,9 @@ export interface RunOpts {
    * is binding the way other hard requirements are.
    */
   universe?: UniverseName;
+  /** Who receives the result, for the data display policy
+   * (runtime/display-policy.ts); absent means the website. */
+  channel?: Channel;
 }
 
 /** Adapter: v3-shaped Crit → M2 Requirements for the SQL hard filter. */
@@ -273,7 +276,8 @@ export async function completeResearch(
   // must not quote it. Ranking and the numeric requirement filters below still
   // read every figure we hold.
   const flags = displayFlags();
-  const hygiene = promptHygieneActive(flags);
+  const channel = opts?.channel ?? 'web';
+  const hygiene = promptHygieneActive(flags, channel);
 
   // 2. /candidates — embedding computed from the ENGLISH structured thesis (§4.1c note).
   const thesisText = diversified
@@ -434,7 +438,7 @@ export async function completeResearch(
     // enrichment text in the analysis prompt (display policy).
     let analysisHygiene: AnalysisHygiene | null = null;
     if (hygiene) {
-      analysisHygiene = { flags, ownText: new Map() };
+      analysisHygiene = { flags, channel, ownText: new Map() };
       const withheld = picks.filter((p) => analysisNeedsHygiene(p.a, analysisHygiene)).map((p) => p.a.id);
       analysisHygiene.ownText = await ownTextFor(withheld);
     }

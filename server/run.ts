@@ -283,13 +283,15 @@ async function performRunCharged(
         hasAnyConstraint(crit) ? crit : null,
         (line) => send('status', line),
         undefined,
-        { breadth, finReq: input.finReq, universe: input.universe },
+        { breadth, finReq: input.finReq, universe: input.universe, channel: input.channel },
       );
-      send('status', 'Loading prices and 30 day history…');
       const refs = await vendorRefs(result.picks.map((p) => p.a.id));
       // Only what this channel may show is fetched (display policy): a withheld
       // equity costs no FMP call, an API run without relay rights no CoinGecko call.
-      market = await marketForAll(refs.filter((r) => shouldFetchMarket(r, input.channel, flags)));
+      const toFetch = refs.filter((r) => shouldFetchMarket(r, input.channel, flags));
+      // Said only when something will load (e2e P2-3).
+      if (toFetch.length) send('status', 'Loading prices and 30 day history…');
+      market = await marketForAll(toFetch);
       for (const r of refs) refById.set(r.id, r);
       // Outbound links (spec §5.6b): project/company site + a financial-info
       // platform (CoinGecko / Yahoo Finance).

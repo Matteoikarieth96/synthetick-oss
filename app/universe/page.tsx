@@ -101,6 +101,21 @@ const tokenPrice = (a: UniverseAsset): number | null => {
 
 const uniswapBuyUrl = (address: string) => 'https://app.uniswap.org/swap?chain=robinhood&outputCurrency=' + address;
 
+/** Row and card logo: the payload's own logo (the display policy drops vendor
+ * CDN logos), else the company site's favicon, the same fallback the result
+ * cards use (assetLogo in public/signal-desk.js). */
+const assetLogo = (a: UniverseAsset): string | null => {
+  if (a.logo) return a.logo;
+  if (!a.website) return null;
+  try {
+    // Without www.: Google indexes many sites at 64px or more only on the bare host.
+    const host = new URL(a.website).hostname.replace(/^www\./, '');
+    return 'https://www.google.com/s2/favicons?sz=128&domain=' + encodeURIComponent(host);
+  } catch {
+    return null;
+  }
+};
+
 /** Onchain market cap: token supply times token price (DEX price first, the
  * venue per-token value as fallback) — the tokens, not the equities. */
 const onchainMcap = (a: UniverseAsset): number | null => {
@@ -355,8 +370,14 @@ export default function UniversePage() {
     return () => clearInterval(timer);
   }, [load]);
 
+  // Equity market cap withheld by the display policy (or null on every row):
+  // that column would be all dashes, so it is hidden and the token market cap
+  // is the default sort, leaving one "Mkt cap" header (e2e P2-2).
+  const capWithheld = policyNote != null || (assets.length > 0 && assets.every((a) => a.marketCapUsd == null));
+  const sortKey: SortKey = sort === 'mcap' && capWithheld ? 'onmcap' : sort;
+
   const sortVal = useCallback((a: UniverseAsset): number | string => {
-    switch (sort) {
+    switch (sortKey) {
       case 'ticker': return a.ticker;
       case 'mcap': return a.marketCapUsd ?? -1;
       case 'onmcap': return onchainMcap(a) ?? -1;
@@ -370,7 +391,7 @@ export default function UniversePage() {
       case 'type': return a.kind;
       case 'region': return a.region ?? '';
     }
-  }, [sort]);
+  }, [sortKey]);
 
   const view = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -403,7 +424,7 @@ export default function UniversePage() {
   }, [assets]);
 
   const setSortKey = (k: SortKey) => {
-    if (sort === k) setDesc(!desc);
+    if (sortKey === k) setDesc(!desc);
     else {
       setSort(k);
       setDesc(k !== 'ticker' && k !== 'type' && k !== 'region');
@@ -427,7 +448,7 @@ export default function UniversePage() {
       title={cat === 'on' ? 'Onchain data' : cat === 'off' ? 'Offchain data' : undefined}
     >
       {label}
-      {sort === k ? <span className="uv-arrow">{desc ? ' ▾' : ' ▴'}</span> : null}
+      {sortKey === k ? <span className="uv-arrow">{desc ? ' ▾' : ' ▴'}</span> : null}
     </th>
   );
 
@@ -615,7 +636,7 @@ export default function UniversePage() {
                 {th('Token price', 'unipx', 'on')}
                 {th('Underlying value', 'offpx', 'off')}
                 {th('Shares/token', 'mult', 'on')}
-                {th('Mkt cap', 'mcap', 'off')}
+                {capWithheld ? null : th('Mkt cap', 'mcap', 'off')}
                 {th('Mkt cap', 'onmcap', 'on')}
                 {th('TVL', 'tvl', 'on')}
                 {th('DEX vol 24h', 'dexvol', 'on')}
@@ -629,10 +650,11 @@ export default function UniversePage() {
             <tbody>
               {view.map((a) => {
                 const offPx = tokenPrice(a);
+                const logo = assetLogo(a);
                 return (
                   <tr key={a.ticker} className="uv-row" onClick={() => setSel(a)}>
                     <td className="uv-asset">
-                      {a.logo ? <img src={a.logo} alt="" width={22} height={22} loading="lazy" /> : <span className="uv-nologo" />}
+                      {logo ? <img src={logo} alt="" width={22} height={22} loading="lazy" referrerPolicy="no-referrer" /> : <span className="uv-nologo" />}
                       <div>
                         <span className="uv-ticker">{a.ticker}</span>
                         <span className="uv-name">{a.name}</span>
@@ -705,7 +727,7 @@ export default function UniversePage() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="uv-num">{fmtBig(a.marketCapUsd)}</td>
+                    {capWithheld ? null : <td className="uv-num">{fmtBig(a.marketCapUsd)}</td>}
                     <td className="uv-num">{fmtBig(onchainMcap(a))}</td>
                     <td className="uv-num">{fmtBig(a.dex?.tvlUsd ?? null)}</td>
                     <td className="uv-num">{fmtBig(a.dex?.volume24hUsd ?? null)}</td>
@@ -854,11 +876,12 @@ function AssetCard({ a, policyNote, onClose }: { a: UniverseAsset; policyNote: s
   const target = metricNum(a, 'price_target_avg');
   const upside = upsidePct(a);
   const holdings = (a.portfolio?.top_holdings ?? []).slice(0, 8);
+  const logo = assetLogo(a);
   return (
     <div className="uv-overlay" onClick={onClose}>
       <div className="uv-card" onClick={(e) => e.stopPropagation()}>
         <header className="uv-card-head">
-          {a.logo ? <img src={a.logo} alt="" width={34} height={34} /> : <span className="uv-nologo" />}
+          {logo ? <img src={logo} alt="" width={34} height={34} referrerPolicy="no-referrer" /> : <span className="uv-nologo" />}
           <div className="uv-card-title">
             <h2>
               {a.ticker} <span className="uv-card-name">{a.name}</span>

@@ -787,6 +787,20 @@ function emptyTableClient(rows: unknown[] = []) {
   check('R5 /v1/screen and /v1/assets read lenient, /api/* strict', server.split("MAX_JSON_BODY_BYTES, 'lenient')").length - 1 === 2 && /normalizeJsonContentType\(req\)/.test(server));
 }
 
+// ==== E8: the stateless /mcp endpoint takes POST only ===========================
+{
+  const server = src('server/server.ts');
+  const mcpRoute = server.slice(server.indexOf("if (path === '/mcp')"), server.indexOf('return handleMcp(req, res, mcpUser)'));
+  const refuse = mcpRoute.indexOf("if (method !== 'POST')");
+  check(
+    'E8 GET (and any method but POST) on /mcp is a 405 with Allow: POST, OPTIONS, before auth and the transport',
+    refuse > 0 && /if \(method !== 'POST'\) \{\s*res\.writeHead\(405, \{ 'content-type': 'application\/json', allow: 'POST, OPTIONS' \}\);/.test(mcpRoute) && refuse < mcpRoute.indexOf('v1User(req, res)'),
+    mcpRoute.slice(0, 120),
+  );
+  check('E8 OPTIONS on /mcp advertises the same methods', /res\.writeHead\(204, \{ allow: 'POST, OPTIONS' \}\)/.test(mcpRoute) && !/GET, POST, DELETE/.test(mcpRoute));
+  check('E8 the transport is still stateless (no session id generator)', /new StreamableHTTPServerTransport\(\{ sessionIdGenerator: undefined \}\)/.test(src('server/mcp.ts')));
+}
+
 // ==== small items ================================================================
 {
   check('referer: default https://synthetick.org', llm.openRouterReferer() === 'https://synthetick.org');

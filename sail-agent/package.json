@@ -14,7 +14,7 @@
     "viem": "^2.21.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.4",
     "typescript": "^5.5.0",
     "@sail.money/sailor": "^2.1.3"
   }

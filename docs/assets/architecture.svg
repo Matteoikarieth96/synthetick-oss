@@ -1,0 +1,94 @@
+<svg viewBox="0 0 1200 740" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
+  <title id="t">SyntheTick architecture</title>
+  <desc id="d">Data flows from market data sources through scheduled ingestion into a Postgres and pgvector store. A six-step runtime pipeline turns a thesis into audited picks, served through a web app, a public API, an MCP server, an X bot and the experimental Sail agent.</desc>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#9aa39a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <style>
+      text{font-family:'Space Grotesk','Helvetica Neue',Arial,sans-serif;fill:#e8e4d8}
+      .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+      .h{font-size:13px;letter-spacing:.14em;fill:#9aa39a;font-weight:600}
+      .t{font-size:16px;font-weight:600}
+      .s{font-size:12.5px;fill:#9aa39a}
+      .box{fill:#131b17;stroke:rgba(232,228,216,.22);stroke-width:1.2}
+      .amb{fill:rgba(240,168,60,.12);stroke:#f0a83c;stroke-width:1.4}
+      .pur{fill:rgba(201,162,232,.12);stroke:#c9a2e8;stroke-width:1.4}
+      .grn{fill:rgba(127,174,122,.12);stroke:#7fae7a;stroke-width:1.4}
+      .ln{stroke:#9aa39a;stroke-width:1.6;fill:none}
+    </style>
+  </defs>
+  <rect width="1200" height="740" rx="18" fill="#0d1310"/>
+  <text x="40" y="52" font-size="26" font-weight="700">How SyntheTick works</text>
+  <text x="40" y="76" class="s" style="font-size:14px">From market data to an audited list of picks. Every box below is a folder you can read and change.</text>
+
+  <!-- column headers -->
+  <text x="40" y="122" class="h">1 · DATA SOURCES</text>
+  <text x="262" y="122" class="h">2 · INGEST</text>
+  <text x="446" y="122" class="h">3 · STORE</text>
+  <text x="640" y="122" class="h">4 · RUNTIME PIPELINE</text>
+  <text x="960" y="122" class="h">5 · SURFACES</text>
+
+  <!-- sources -->
+  <g>
+    <rect class="box" x="40" y="138" width="190" height="62" rx="10"/><text class="t" x="56" y="164">Crypto markets</text><text class="s" x="56" y="184">CEX + DEX venues</text>
+    <rect class="box" x="40" y="212" width="190" height="62" rx="10"/><text class="t" x="56" y="238">Stocks, ETFs, bonds</text><text class="s" x="56" y="258">vendor data (bring your key)</text>
+    <rect class="box" x="40" y="286" width="190" height="62" rx="10"/><text class="t" x="56" y="312">Pre-IPO companies</text><text class="s" x="56" y="332">optional stored data</text>
+    <rect class="box" x="40" y="360" width="190" height="62" rx="10"/><text class="t" x="56" y="386">Tokenized stocks</text><text class="s" x="56" y="406">on-chain universe</text>
+    <rect class="box" x="40" y="434" width="190" height="62" rx="10"/><text class="t" x="56" y="460">FX rates</text><text class="s" x="56" y="480">normalise to USD</text>
+  </g>
+  <!-- ingest -->
+  <rect class="amb" x="262" y="138" width="156" height="358" rx="12"/>
+  <text class="t" x="278" y="166">ingest/</text>
+  <text class="s mono" x="278" y="194">scheduled jobs</text>
+  <text class="s" x="278" y="228">Normalise fields</text>
+  <text class="s" x="278" y="250">Dedupe by ISIN</text>
+  <text class="s" x="278" y="272">Quality gates</text>
+  <text class="s" x="278" y="294">Domicile + region</text>
+  <text class="s" x="278" y="316">Embed descriptions</text>
+  <text class="s" x="278" y="352">Runs daily in</text>
+  <text class="s" x="278" y="372">GitHub Actions</text>
+  <!-- store -->
+  <rect class="pur" x="446" y="138" width="156" height="358" rx="12"/>
+  <text class="t" x="462" y="166">Postgres</text>
+  <text class="s mono" x="462" y="194">+ pgvector</text>
+  <text class="s" x="462" y="228">assets</text>
+  <text class="s" x="462" y="250">asset_embeddings</text>
+  <text class="s" x="462" y="272">asset_metrics</text>
+  <text class="s" x="462" y="294">asset_prices</text>
+  <text class="s" x="462" y="316">users, credits</text>
+  <text class="s" x="462" y="352">Schema in db/</text>
+  <text class="s" x="462" y="372">Works on Supabase</text>
+
+  <!-- pipeline steps -->
+  <g>
+    <rect class="box" x="640" y="138" width="290" height="46" rx="9"/><text class="t" x="656" y="167">① Extract the thesis</text>
+    <rect class="box" x="640" y="194" width="290" height="46" rx="9"/><text class="t" x="656" y="223">② Retrieve (SQL + vectors)</text>
+    <rect class="box" x="640" y="250" width="290" height="46" rx="9"/><text class="t" x="656" y="279">③ Rerank, score 0 to 100</text>
+    <rect class="grn" x="640" y="306" width="290" height="46" rx="9"/><text class="t" x="656" y="335">④ Audit in code, per pick</text>
+    <rect class="grn" x="640" y="362" width="290" height="46" rx="9"/><text class="t" x="656" y="391">⑤ Audit against your words</text>
+    <rect class="box" x="640" y="418" width="290" height="46" rx="9"/><text class="t" x="656" y="447">⑥ Analyse + live market data</text>
+    <text class="s mono" x="640" y="488" style="font-size:11px">runtime/ · thesis, candidates, select, audit, analysis, market</text>
+  </g>
+  <!-- surfaces -->
+  <g>
+    <rect class="box" x="960" y="138" width="200" height="56" rx="10"/><text class="t" x="976" y="163">Web app</text><text class="s" x="976" y="182">Next.js, live status stream</text>
+    <rect class="box" x="960" y="204" width="200" height="56" rx="10"/><text class="t" x="976" y="229">Public API</text><text class="s mono" x="976" y="248" style="font-size:11px">/v1, API keys</text>
+    <rect class="box" x="960" y="270" width="200" height="56" rx="10"/><text class="t" x="976" y="295">MCP server</text><text class="s" x="976" y="314">for AI agents</text>
+    <rect class="box" x="960" y="336" width="200" height="56" rx="10"/><text class="t" x="976" y="361">X bot</text><text class="s" x="976" y="380">reply to a post</text>
+    <rect class="box" x="960" y="402" width="200" height="56" rx="10"/><text class="t" x="976" y="427">Sail agent</text><text class="s" x="976" y="446">experimental, trades</text>
+  </g>
+
+  <!-- arrows -->
+  <path class="ln" d="M230 317H258" marker-end="url(#ar)"/>
+  <path class="ln" d="M418 317H442" marker-end="url(#ar)"/>
+  <path class="ln" d="M602 317H636" marker-end="url(#ar)"/>
+  <path class="ln" d="M930 317H956" marker-end="url(#ar)"/>
+  <path class="ln" d="M785 184V194" marker-end="url(#ar)"/><path class="ln" d="M785 240V250" marker-end="url(#ar)"/><path class="ln" d="M785 296V306" marker-end="url(#ar)"/><path class="ln" d="M785 352V362" marker-end="url(#ar)"/><path class="ln" d="M785 408V418" marker-end="url(#ar)"/>
+
+  <!-- honesty contract -->
+  <rect x="40" y="540" width="1120" height="160" rx="14" fill="rgba(127,174,122,.08)" stroke="#7fae7a" stroke-width="1.3"/>
+  <text x="64" y="578" font-size="18" font-weight="700" style="fill:#7fae7a">The honesty contract</text>
+  <text x="64" y="610" font-size="15">A requirement from the thesis is enforced three times: the SQL hard filter, the code audit, the LLM audit.</text>
+  <text x="64" y="636" font-size="15">If nothing qualifies, the answer is "Nothing matched your requirements". Requirements are never relaxed quietly.</text>
+  <text x="64" y="662" font-size="15">Every number carries an "as of" time. If a vendor has no data, the card shows a dash. Nothing is simulated.</text>
+  <text x="64" y="688" class="s" style="font-size:13px">Research starting point, not investment advice.</text>
+</svg>

@@ -1,0 +1,490 @@
+/**
+ * In-memory rate limiting + run concurrency caps (security audit H2).
+ *
+ * Why in memory: SyntheTick runs as ONE Node process (Railway), so a Map is
+ * enough and adds no dependency or round trip. If the app is ever scaled out
+ * to several instances, each instance enforces its own budget (limits become
+ * per instance); move the buckets to Redis/Postgres then.
+ *
+ * Limits are defense in depth, NOT credit economics: they never charge or
+ * change what a run costs, they only stop abuse bursts. All defaults can be
+ * overridden by env (see LIMIT_DEFS).
+ *
+ * Client IP: derived from the socket. X-Forwarded-For is trusted ONLY when
+ * TRUST_PROXY is set to the number of proxies in front of the app (1 = one
+ * proxy such as Railway's edge: take the rightmost entry; 2 = Cloudflare in
+ * front of Railway: take the second from the right). Trusting the header
+ * without a proxy would let any client pick its own IP and dodge the limiter,
+ * so the default is the raw socket address.
+ *
+ * Pure module (no env.ts import): the security gate tests it offline.
+ */
+import type http from 'node:http';
+import { isIP } from 'node:net';
+import { PublicError } from '../runtime/errors.js';
+import { isLoopbackAddress, isPrivateAddress } from '../runtime/netguard.js';
+
+// ---- token bucket -----------------------------------------------------------
+
+export type TakeResult = { ok: true; remaining: number } | { ok: false; retryAfterSec: number };
+
+/**
+ * Classic token bucket: `capacity` tokens, refilled continuously so a full
+ * bucket regenerates over `windowMs` (capacity per window). Starts full, so a
+ * legitimate burst up to `capacity` always passes.
+ */
+export class TokenBucketLimiter {
+  private buckets = new Map<string, { tokens: number; at: number }>();
+  private ops = 0;
+  private lastPruneAt = 0;
+
+  constructor(
+    readonly capacity: number,
+    readonly windowMs: number,
+    private now: () => number = Date.now,
+    private maxKeys = 50_000,
+  ) {}
+
+  take(key: string, cost = 1): TakeResult {
+    const t = this.now();
+    const perMs = this.capacity / this.windowMs;
+    const prev = this.buckets.get(key);
+    let tokens = prev ? Math.min(this.capacity, prev.tokens + (t - prev.at) * perMs) : this.capacity;
+    let result: TakeResult;
+    if (tokens >= cost) {
+      tokens -= cost;
+      result = { ok: true, remaining: Math.floor(tokens) };
+    } else {
+      result = { ok: false, retryAfterSec: Math.max(1, Math.ceil((cost - tokens) / perMs / 1000)) };
+    }
+    // Delete + set keeps Map insertion order = least recently used first.
+    this.buckets.delete(key);
+    this.buckets.set(key, { tokens, at: t });
+    // Over the cap, prune at most once a second: a flood of new keys must not
+    // turn every request into a full scan (audit N5).
+    if (this.ops++ % 1000 === 999 || (this.buckets.size > this.maxKeys && t - this.lastPruneAt >= 1000)) this.prune(t);
+    return result;
+  }
+
+  /**
+   * Drop buckets that have fully refilled (indistinguishable from new, so
+   * dropping them loses nothing). A bucket that is still draining or
+   * throttled is NEVER evicted, so a flood of fresh keys
+   * cannot reset an active throttle (audit N5); the map can only exceed the
+   * cap by the number of keys that are currently busy, which empties within
+   * one window.
+   */
+  private prune(t: number): void {
+    this.lastPruneAt = t;
+    const perMs = this.capacity / this.windowMs;
+    for (const [k, b] of this.buckets) {
+      if (b.tokens + (t - b.at) * perMs >= this.capacity) this.buckets.delete(k);
+    }
+  }
+
+  get size(): number {
+    return this.buckets.size;
+  }
+}
+
+// ---- daily quota --------------------------------------------------------------
+
+const DAY_MS = 86_400_000;
+const utcDay = (t: number) => Math.floor(t / DAY_MS);
+
+/** Seconds from `t` to the next midnight UTC (at least 1): the Retry-After of a daily limit. */
+export function secondsUntilUtcMidnight(t = Date.now()): number {
+  return Math.max(1, Math.ceil(((utcDay(t) + 1) * DAY_MS - t) / 1000));
+}
+
+/**
+ * A count per key per UTC day (final audit H1, L5): `limit` units per key,
+ * reset at midnight UTC. In memory like the buckets above (one process; a
+ * restart forgets today's counts). Entries from earlier days are dropped once
+ * the map grows past `maxKeys`.
+ */
+export class DailyQuota {
+  private counts = new Map<string, { day: number; n: number }>();
+
+  constructor(
+    readonly limit: number,
+    private now: () => number = Date.now,
+    private maxKeys = 10_000,
+  ) {}
+
+  /** Units `key` has used today. */
+  used(key: string): number {
+    const c = this.counts.get(key);
+    return c && c.day === utcDay(this.now()) ? c.n : 0;
+  }
+
+  /** Count one unit for `key` today; false (nothing counted) once the limit is reached. */
+  take(key: string): boolean {
+    const day = utcDay(this.now());
+    const n = this.used(key);
+    if (n >= this.limit) return false;
+    this.counts.set(key, { day, n: n + 1 });
+    if (this.counts.size > this.maxKeys) {
+      for (const [k, c] of this.counts) if (c.day !== day) this.counts.delete(k);
+    }
+    return true;
+  }
+
+  /** Undo one take: the counted work did not happen after all. */
+  giveBack(key: string): void {
+    const c = this.counts.get(key);
+    if (c && c.day === utcDay(this.now()) && c.n > 0) c.n -= 1;
+  }
+
+  get size(): number {
+    return this.counts.size;
+  }
+}
+
+// ---- concurrency cap --------------------------------------------------------
+
+/** Caps simultaneous in-flight work per key (e.g. pipeline runs per user). */
+export class ConcurrencyGuard {
+  private active = new Map<string, number>();
+
+  constructor(readonly max: number) {}
+
+  /** True when `key` could acquire a slot right now (nothing is taken). */
+  available(key: string): boolean {
+    return (this.active.get(key) ?? 0) < this.max;
+  }
+
+  /** A release function, or null when the key is already at its cap. */
+  acquire(key: string): (() => void) | null {
+    const n = this.active.get(key) ?? 0;
+    if (n >= this.max) return null;
+    this.active.set(key, n + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const cur = this.active.get(key) ?? 1;
+      if (cur <= 1) this.active.delete(key);
+      else this.active.set(key, cur - 1);
+    };
+  }
+}
+
+// ---- named limits -----------------------------------------------------------
+
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+
+/** name -> [env var, default capacity, window ms, human description] */
+const LIMIT_DEFS = {
+  /** Every API request per client IP (coarse, protects auth lookups and Supabase). */
+  ip: ['RATE_IP_PER_MIN', 60, MIN],
+  /** /api/thesis and /api/extract per user: each call is 1-2 paid LLM calls (daily caps below too). */
+  llm: ['RATE_LLM_PER_USER_HOUR', 20, HOUR],
+  /** POST /v1/assets per user (also costs 1 credit). */
+  assets: ['RATE_ASSETS_PER_USER_HOUR', 60, HOUR],
+  /** Pipeline runs (/api/complete, /v1/screen, MCP run_screen) per user (also cost 1 credit). */
+  run: ['RATE_RUN_PER_USER_HOUR', 30, HOUR],
+  /** Paid lookups per user: the `:online` web-search fallbacks, the ytscribe
+   * transcript API and the thesis review's web entity check. */
+  websearch: ['RATE_WEBSEARCH_PER_USER_HOUR', 6, HOUR],
+  /** /v1/universe/* per IP: the explorer fans out one request per opened asset. */
+  universe: ['RATE_UNIVERSE_PER_IP_MIN', 120, MIN],
+  /** Keyless same-origin universe reads (the signed-out explorer), per IP. */
+  universe_anon: ['RATE_UNIVERSE_ANON_PER_IP_MIN', 30, MIN],
+} as const;
+
+export type LimitName = keyof typeof LIMIT_DEFS;
+
+function envInt(name: string, fallback: number): number {
+  const n = Number(process.env[name]);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+const limiters = new Map<LimitName, TokenBucketLimiter>();
+
+export function limiter(name: LimitName): TokenBucketLimiter {
+  let l = limiters.get(name);
+  if (!l) {
+    const [envVar, def, windowMs] = LIMIT_DEFS[name];
+    l = new TokenBucketLimiter(envInt(envVar, def), windowMs);
+    limiters.set(name, l);
+  }
+  return l;
+}
+
+/** Test hook: forget every bucket, quota and slot (and re-read env). */
+export function resetLimitersForTests(): void {
+  limiters.clear();
+  quotas.clear();
+  runGuard = null;
+  extractGlobal = null;
+  extractPerActor = null;
+}
+
+// ---- daily quotas -------------------------------------------------------------
+
+/** name -> [env var, default per UTC day] */
+const DAILY_DEFS = {
+  /** /api/thesis + /api/extract per user (or per client address when anonymous). */
+  llm_user: ['RATE_LLM_PER_USER_DAY', 40],
+  /** The same uncharged calls summed over EVERY caller: the service-wide daily LLM budget. */
+  llm_global: ['RATE_LLM_GLOBAL_PER_DAY', 1500],
+  /** Automatic credit refunds after a failed run, per user (final audit L5). */
+  refund: ['REFUNDS_PER_USER_DAY', 3],
+} as const;
+
+type DailyName = keyof typeof DAILY_DEFS;
+const quotas = new Map<DailyName, DailyQuota>();
+
+export function dailyQuota(name: DailyName): DailyQuota {
+  let q = quotas.get(name);
+  if (!q) {
+    const [envVar, def] = DAILY_DEFS[name];
+    q = new DailyQuota(envInt(envVar, def));
+    quotas.set(name, q);
+  }
+  return q;
+}
+
+const GLOBAL_KEY = 'all';
+
+/**
+ * Count one uncharged LLM request (/api/thesis, /api/extract) for `actor`
+ * against its daily quota AND the service-wide daily budget (final audit H1).
+ * Both are checked before either is counted, so a refusal costs nothing.
+ * Throws a 429 that says which limit was hit and that it resets at midnight UTC.
+ */
+export function consumeUnchargedLlm(actor: string): void {
+  const mine = dailyQuota('llm_user');
+  const all = dailyQuota('llm_global');
+  const retry = secondsUntilUtcMidnight();
+  if (mine.used(actor) >= mine.limit) {
+    throw new PublicError(
+      429,
+      'rate_limited',
+      `You have reached today's limit of ${mine.limit} thesis reviews and source reads. It resets at midnight UTC.`,
+      retry,
+    );
+  }
+  if (all.used(GLOBAL_KEY) >= all.limit) {
+    throw new PublicError(
+      429,
+      'rate_limited',
+      'SyntheTick has used up today\'s capacity for thesis reviews and source reads. Please try again after midnight UTC.',
+      retry,
+    );
+  }
+  mine.take(actor);
+  all.take(GLOBAL_KEY);
+}
+
+/** Claim one of today's automatic refunds for a user; false once REFUNDS_PER_USER_DAY are used. */
+export function takeRefundAllowance(userId: string): boolean {
+  return dailyQuota('refund').take(`u:${userId}`);
+}
+
+/** Give a claimed refund back (the refund itself failed, so it did not happen). */
+export function returnRefundAllowance(userId: string): void {
+  dailyQuota('refund').giveBack(`u:${userId}`);
+}
+
+// ---- /api/extract concurrency (final audit M2) ----------------------------------
+
+let extractGlobal: ConcurrencyGuard | null = null;
+let extractPerActor: ConcurrencyGuard | null = null;
+
+/**
+ * A slot for one /api/extract request, taken BEFORE its body is buffered: an
+ * upload can be 35 MB and parsing multiplies that, so at most
+ * EXTRACT_MAX_CONCURRENT (default 4) bodies are in memory server-wide and one
+ * per user (EXTRACT_MAX_CONCURRENT_PER_USER, default 1). `actor` null skips the
+ * per-user cap (loopback development). Returns the release function.
+ */
+export function acquireExtractSlot(actor: string | null): () => void {
+  extractGlobal ??= new ConcurrencyGuard(envInt('EXTRACT_MAX_CONCURRENT', 4));
+  extractPerActor ??= new ConcurrencyGuard(envInt('EXTRACT_MAX_CONCURRENT_PER_USER', 1));
+  const mine = actor ? extractPerActor.acquire(actor) : () => {};
+  if (!mine) {
+    throw new PublicError(429, 'rate_limited', 'Another source is still being read. Wait for it to finish, then try again.', 5);
+  }
+  const shared = extractGlobal.acquire(GLOBAL_KEY);
+  if (!shared) {
+    mine();
+    throw new PublicError(503, 'server_busy', 'SyntheTick is reading many sources right now. Please try again in a few seconds.', 10);
+  }
+  return () => {
+    shared();
+    mine();
+  };
+}
+
+export const RATE_LIMITED_MESSAGE = 'Too many requests. Please slow down and try again shortly.';
+
+/** Consume one token from `name` for `key`; throws PublicError 429 (rate_limited) when empty. */
+export function consume(name: LimitName, key: string): void {
+  const r = limiter(name).take(key);
+  if (!r.ok) {
+    throw new PublicError(
+      429,
+      'rate_limited',
+      `${RATE_LIMITED_MESSAGE} Retry in ${r.retryAfterSec} second${r.retryAfterSec === 1 ? '' : 's'}.`,
+      r.retryAfterSec,
+    );
+  }
+}
+
+/** Non-throwing variant for soft gates (web-search fallback): true = allowed. */
+export function tryConsume(name: LimitName, key: string): boolean {
+  return limiter(name).take(key).ok;
+}
+
+/** Key for per-user limits: the account when signed in, else the client address
+ * (an IPv6 client keyed by its /64, final audit L16, so one subscriber network
+ * cannot mint a fresh budget per address). */
+export function actorKey(user: { id: string } | null, req: Pick<http.IncomingMessage, 'headers' | 'socket'>): string {
+  return user ? `u:${user.id}` : `ip:${ipBucketKey(clientIp(req).ip)}`;
+}
+
+// ---- concurrency of pipeline runs ------------------------------------------
+
+let runGuard: ConcurrencyGuard | null = null;
+
+function tooManyRuns(max: number): PublicError {
+  return new PublicError(
+    429,
+    'too_many_runs',
+    `You already have ${max} screens running. Wait for one to finish before starting another.`,
+    15,
+  );
+}
+
+/** Throws the too_many_runs 429 when the user could not start another run now
+ * (nothing is taken). Lets a handler that charges BEFORE the run core refuse
+ * early instead of charging for a run the concurrency cap would turn away
+ * (final audit L4). */
+export function assertRunSlotAvailable(userId: string): void {
+  runGuard ??= new ConcurrencyGuard(envInt('MAX_CONCURRENT_RUNS', 2));
+  if (!runGuard.available(userId)) throw tooManyRuns(runGuard.max);
+}
+
+/** At most MAX_CONCURRENT_RUNS (default 2) pipeline runs in flight per user. */
+export function acquireRunSlot(userId: string): () => void {
+  runGuard ??= new ConcurrencyGuard(envInt('MAX_CONCURRENT_RUNS', 2));
+  const release = runGuard.acquire(userId);
+  if (!release) throw tooManyRuns(runGuard.max);
+  return release;
+}
+
+// ---- client IP --------------------------------------------------------------
+
+/** Number of trusted proxies in front of the app (TRUST_PROXY=1 or a hop count); 0 = none. */
+export function trustedProxyHops(env: Record<string, string | undefined> = process.env): number {
+  const v = (env.TRUST_PROXY ?? '').trim().toLowerCase();
+  if (!v || v === '0' || v === 'false') return 0;
+  if (v === 'true') return 1;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/** Strip the IPv4-mapped IPv6 prefix so ::ffff:1.2.3.4 and 1.2.3.4 share one bucket. */
+function normalizeIp(ip: string): string {
+  return ip.replace(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i, '$1');
+}
+
+export interface ClientIp {
+  ip: string;
+  /** True when the address came from X-Forwarded-For under TRUST_PROXY. */
+  viaProxy: boolean;
+}
+
+/**
+ * The client address for rate limiting. Socket address unless TRUST_PROXY is
+ * set, in which case the Nth-from-right X-Forwarded-For entry (N = hops) is
+ * used when it is a valid IP; any malformed header falls back to the socket.
+ */
+export function clientIp(
+  req: Pick<http.IncomingMessage, 'headers' | 'socket'>,
+  env: Record<string, string | undefined> = process.env,
+): ClientIp {
+  const socketIp = normalizeIp(req.socket?.remoteAddress ?? 'unknown');
+  const hops = trustedProxyHops(env);
+  if (hops > 0) {
+    const raw = req.headers['x-forwarded-for'];
+    const header = Array.isArray(raw) ? raw.join(',') : raw;
+    if (header) {
+      const parts = header.split(',').map((s) => s.trim()).filter(Boolean);
+      const pick = parts[parts.length - hops];
+      if (pick && isIP(pick)) return { ip: normalizeIp(pick), viaProxy: true };
+    }
+  }
+  return { ip: socketIp, viaProxy: false };
+}
+
+/**
+ * Bucket key for an address: IPv4 as is, IPv6 reduced to its /64 (one
+ * subscriber network), so a client that owns a /64 cannot mint 2^64 buckets.
+ */
+export function ipBucketKey(ip: string): string {
+  if (isIP(ip) !== 6) return ip;
+  const s = ip.split('%')[0]!.toLowerCase();
+  const [head = '', tail = ''] = s.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = s.includes('::') ? [...left, ...new Array<string>(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right] : left;
+  const first4 = groups.slice(0, 4).map((g) => Number.parseInt(g, 16));
+  if (first4.length !== 4 || first4.some((n) => !Number.isFinite(n))) return ip; // embedded IPv4 tail etc.: keep whole
+  return `${first4.map((n) => n.toString(16)).join(':')}::/64`;
+}
+
+let warnedSharedIp = false;
+
+/** Test hook: let the one-shot shared-IP warning fire again. */
+export function resetSharedIpWarningForTests(): void {
+  warnedSharedIp = false;
+}
+
+/**
+ * Boot-time hint: a deployed server without TRUST_PROXY sits behind a proxy
+ * (Railway, Cloudflare) whose address is private, so the per-IP limit below
+ * silently switches itself off. Say so once at startup (audit N5).
+ */
+export function warnIfTrustProxyUnset(
+  env: Record<string, string | undefined>,
+  warn: (msg: string) => void,
+  deployed: boolean,
+): void {
+  if (!deployed || trustedProxyHops(env) > 0) return;
+  warn(
+    'TRUST_PROXY is not set: if a proxy sits in front of this server, per-IP rate limits are OFF because every ' +
+      'request arrives from the proxy\'s private address. Set TRUST_PROXY to the number of proxies in front of it: ' +
+      '2 behind Cloudflare plus Railway (the synthetick.org setup), 1 behind Railway alone. Do not use 1 behind ' +
+      'Cloudflare: every visitor would then share one Cloudflare edge address. Per-user limits and credits still apply.',
+  );
+}
+
+/**
+ * Enforce the per-IP bucket `name`. When the peer is a private/loopback address
+ * and no proxy is trusted, every client looks like the same proxy, so an IP
+ * bucket would throttle the whole site as one user: skip it (per-user buckets
+ * and the run cap still apply) and warn once so the operator sets TRUST_PROXY.
+ * Loopback in development stays silent (that is just you).
+ */
+export function consumeIp(
+  name: LimitName,
+  req: Pick<http.IncomingMessage, 'headers' | 'socket'>,
+  warn: (msg: string) => void = () => {},
+): void {
+  const { ip, viaProxy } = clientIp(req);
+  if (!viaProxy && isPrivateAddress(ip)) {
+    if (!warnedSharedIp && (process.env.NODE_ENV === 'production' || !isLoopbackAddress(ip))) {
+      warnedSharedIp = true;
+      warn(
+        `rate limit: client IP ${ip} is a private address and TRUST_PROXY is not set; per-IP limits are disabled. ` +
+          'Set TRUST_PROXY to the number of proxies in front of the app: 2 behind Cloudflare plus Railway, 1 behind Railway alone.',
+      );
+    }
+    return;
+  }
+  consume(name, `ip:${ipBucketKey(ip)}`);
+}

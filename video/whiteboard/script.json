@@ -1,0 +1,27 @@
+[
+  {"id": "hook", "lines": [
+    {"t": "You have an investment idea."},
+    {"t": "But which real assets actually express it?"}]},
+  {"id": "input", "lines": [
+    {"t": "Paste a thesis, an article, a tweet or a PDF."},
+    {"t": "SyntheTick pulls out the idea, plus your rules: only crypto, only European ETFs, no defense."}]},
+  {"id": "match", "lines": [
+    {"t": "It searches stocks, ETFs, bond funds and crypto."},
+    {"t": "A hard filter in the database means a rule can never be broken."}]},
+  {"id": "rank", "lines": [
+    {"t": "An analyst model picks up to ten assets."},
+    {"t": "Each gets a score from zero to one hundred, and a clear reason."}]},
+  {"id": "audit", "lines": [
+    {"t": "Then two audits check every pick: one in code, one against your own words."},
+    {"t": "Anything that breaks a rule is dropped, and you see why."}]},
+  {"id": "honest", "lines": [
+    {"t": "If nothing qualifies, it says so."},
+    {"t": "If a data vendor has no number, you see a dash."},
+    {"t": "Nothing is invented."}]},
+  {"id": "open", "lines": [
+    {"t": "And now all of it is open source, under the MIT license.", "say": "And now all of it is open source, under the M.I.T. license."},
+    {"t": "The pipeline, the data jobs, the public API, and the MCP server for AI agents.", "say": "The pipeline, the data jobs, the public A.P.I., and the M.C.P. server for A.I. agents."}]},
+  {"id": "join", "lines": [
+    {"t": "Clone it, run it on your laptop, and send a pull request."},
+    {"t": "Code and issues are on GitHub. The live app is at synthetick.org.", "say": "Code and issues are on GitHub. The live app is at synthetick dot org."}]}
+]

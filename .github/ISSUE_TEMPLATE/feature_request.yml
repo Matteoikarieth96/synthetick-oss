@@ -1,0 +1,26 @@
+name: Feature or data source proposal
+description: Suggest an improvement, a new asset class or a new data source
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [data source, asset class, requirements and audits, api or mcp, frontend, docs, tests, other]
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Data terms
+      description: For a new data source only.
+      options:
+        - label: I checked that its terms allow what the code would do, and the repository will not redistribute its data.

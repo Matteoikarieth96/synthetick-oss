@@ -1,0 +1,34 @@
+# gitleaks configuration (used by .github/workflows/secret-scan.yml and the
+# export release gate). Extends the default ruleset and suppresses exactly two
+# known false positives, each by an anchored pattern, never by a whole file:
+#  - sail-agent/src/universe.ts is GENERATED and lists public on-chain token
+#    contract addresses under a "token" key, which the generic-api-key rule
+#    mistakes for secrets. Only a line that holds nothing but that key and a
+#    40-hex-digit address is allowed; every other string in the file is still
+#    scanned and reported.
+#  - the in-app curl examples use the literal placeholder stk_YOUR_KEY. Only a
+#    finding whose secret is exactly that placeholder is allowed.
+# Any other finding must be fixed, not suppressed.
+# Syntax: a rule-level [[rules.allowlists]] and the global [allowlist] table
+# work on gitleaks 8.24 (the default of the pinned gitleaks-action) and on 8.30;
+# the newer [[allowlists]] syntax needs 8.25 or later.
+title = "SyntheTick gitleaks config"
+
+[extend]
+useDefault = true
+
+# Adds an allowlist to the default generic-api-key rule: gitleaks merges a rule
+# with the same id into the default one, so the rule itself is unchanged.
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Public token contract addresses in the generated sail-agent universe"
+condition = "AND"
+paths = ['''(^|/)sail-agent/src/universe\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*"token": "0x[0-9a-fA-F]{40}"( as Address)?,?\s*$''']
+
+[allowlist]
+description = "Documentation placeholder API key"
+regexes = ['''^stk_YOUR_KEY$''']

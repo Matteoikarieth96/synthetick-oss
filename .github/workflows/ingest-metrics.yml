@@ -1,0 +1,40 @@
+name: Ingest metrics (data queries)
+
+# Daily 03:00 UTC — after the equities refresh at 01:00 (spec §15.2), so newly
+# ingested assets already have rows to join to. Pulls the FMP whole-market bulk
+# families, appends one day of closes, recomputes returns, and rewrites
+# asset_metrics. Every family is best-effort: a vendor outage leaves the
+# previous night's values in place rather than emptying a ranking.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest-metrics
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: github.repository == 'Matteoikarieth96/synthetick-oss'  # owner repo only; forks never run cron or spend secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Refresh asset_metrics + asset_prices
+        run: npm run ingest:metrics
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FMP_KEY: ${{ secrets.FMP_KEY }}
+          COINGECKO_KEY: ${{ secrets.COINGECKO_KEY }}

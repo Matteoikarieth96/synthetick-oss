@@ -1,0 +1,32 @@
+# Weekly dependency updates, grouped to keep PR noise low.
+# Minor and patch updates arrive as one grouped PR per ecosystem. Major updates
+# are NOT ignored (security audit L13: a fix that needs a major bump must still
+# reach us); each arrives as its own PR so it can be reviewed on its own.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    target-branch: staging
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /sail-agent
+    schedule:
+      interval: weekly
+    target-branch: staging
+    open-pull-requests-limit: 5
+    groups:
+      sail-agent-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    target-branch: staging
+    groups:
+      github-actions:
+        patterns: ['*']

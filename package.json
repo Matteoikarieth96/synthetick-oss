@@ -1,0 +1,75 @@
+{
+  "name": "synthetick",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "SyntheTick v4 \u2014 investment-thesis matching platform (see signal-desk-v4-spec.md)",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx server/server.ts",
+    "build": "next build",
+    "start": "NODE_ENV=production tsx server/server.ts",
+    "ingest:crypto": "tsx ingest/run-crypto.ts",
+    "ingest:equities": "tsx ingest/run-equities.ts",
+    "ingest:preipo": "tsx ingest/run-preipo.ts",
+    "ingest:metrics": "tsx ingest/run-metrics.ts",
+    "backfill:prices": "tsx ingest/backfill-prices.ts",
+    "archive:fmp": "tsx ingest/archive-fmp.ts",
+    "backfill:websites": "tsx ingest/backfill-websites.ts",
+    "backfill:logos": "tsx ingest/backfill-logos.ts",
+    "load:private-data": "tsx ingest/load-private-data.ts",
+    "universe:robinhood": "tsx ingest/robinhood-universe.ts",
+    "snapshot:market": "tsx ingest/snapshot-market.ts",
+    "enrich:descriptions": "tsx ingest/enrich-descriptions.ts",
+    "embed": "tsx ingest/embeddings/run-embed.ts",
+    "test:candidates": "tsx runtime/test-candidates.ts",
+    "test:credits": "tsx runtime/test-credits.ts",
+    "test:requirements": "tsx runtime/test-requirements.ts",
+    "test:xlink": "tsx runtime/test-xlink.ts",
+    "bot": "tsx bot/worker.ts",
+    "test:bot": "tsx runtime/test-bot.ts",
+    "test:security": "tsx runtime/test-security.ts",
+    "test:x-video": "tsx runtime/test-x-video.ts",
+    "typecheck": "tsc --noEmit",
+    "test:regression": "tsx runtime/test-regression.ts",
+    "test:market": "tsx runtime/test-market.ts",
+    "serve": "npm run dev",
+    "test:prompts": "tsx runtime/test-prompts.ts",
+    "test:similar": "tsx runtime/test-similar.ts",
+    "test:shorts": "tsx runtime/test-shorts.ts",
+    "test:matrix": "tsx runtime/test-matrix.ts",
+    "test:models": "tsx runtime/test-models.ts",
+    "test:flow-report": "tsx runtime/test-flow-report.ts",
+    "test:complex-edge": "tsx runtime/test-complex-edge-cases.ts",
+    "test:finreq-offline": "tsx runtime/test-finreq-offline.ts",
+    "test:parsing-offline": "tsx runtime/test-parsing-offline.ts",
+    "test:offline": "node scripts/test-offline.mjs",
+    "db:setup": "bash db/setup.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "ffmpeg-static": "^5.3.0",
+    "next": "^16.3.8",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tsx": "^4.19.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.6.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.28"
+    }
+  },
+  "license": "MIT"
+}

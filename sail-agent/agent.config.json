@@ -1,0 +1,20 @@
+{
+  "riskTier": "balanced",
+  "maxTradePctOverride": null,
+  "hardCapUsdPerTrade": 200,
+  "minTradeUsd": 1,
+  "slippageBps": 150,
+  "maxQuoteDeviationBps": 300,
+  "watchlist": [],
+  "synthetickBaseUrl": "https://synthetick.org",
+  "newsMaxPostsPerTicker": 8,
+  "newsMaxTickers": 10,
+  "thesisModel": "anthropic/claude-sonnet-4.5",
+  "planTtlHours": 12,
+  "dripEnabled": true,
+  "dripMaxSummariesPerRun": 3,
+  "dripMaxCentsPerRun": 150,
+  "dripMinCoverage": 0.5,
+  "dripMaxAgeDays": 30,
+  "dripNoRebuyDays": 7
+}

@@ -1,0 +1,77 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SyntheTick Agent logo: Dino the mascot with a candlestick antenna">
+  <defs>
+    <radialGradient id="g-body" cx="34%" cy="22%" r="90%">
+      <stop offset="0%" stop-color="#c8e8c0"/>
+      <stop offset="40%" stop-color="#8db888"/>
+      <stop offset="75%" stop-color="#5c8556"/>
+      <stop offset="100%" stop-color="#39592f"/>
+    </radialGradient>
+    <radialGradient id="g-head" cx="38%" cy="24%" r="95%">
+      <stop offset="0%" stop-color="#cfecc7"/>
+      <stop offset="45%" stop-color="#8db888"/>
+      <stop offset="100%" stop-color="#4a7043"/>
+    </radialGradient>
+    <radialGradient id="g-belly" cx="45%" cy="25%" r="80%">
+      <stop offset="0%" stop-color="#e6f3df"/>
+      <stop offset="60%" stop-color="#b5d5ad"/>
+      <stop offset="100%" stop-color="#8fb489"/>
+    </radialGradient>
+    <linearGradient id="g-ao" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="55%" stop-color="#243d1f" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#243d1f" stop-opacity=".5"/>
+    </linearGradient>
+    <radialGradient id="g-bgglow" cx="78%" cy="-4%" r="115%">
+      <stop offset="0%" stop-color="#f0a83c" stop-opacity=".17"/>
+      <stop offset="55%" stop-color="#f0a83c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g-tickglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f0a83c" stop-opacity=".38"/>
+      <stop offset="100%" stop-color="#f0a83c" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="clip-badge"><circle cx="256" cy="256" r="256"/></clipPath>
+    <path id="neckP" d="M16.5 19 C15 27 13.5 33 9 40 C6 44 4.5 48 4.2 52 L44 52 C43.5 47 42 43 39.5 39.5 C36.5 34.5 35 27 34.5 20 Z"/>
+    <clipPath id="clip-neck"><use href="#neckP"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#clip-badge)">
+    <circle cx="256" cy="256" r="256" fill="#0d1310"/>
+    <circle cx="256" cy="256" r="256" fill="url(#g-bgglow)"/>
+
+    <g transform="translate(24.5 80.5) scale(11)">
+      <!-- shoulders and chest rising from the badge rim -->
+      <use href="#neckP" fill="url(#g-body)"/>
+      <use href="#neckP" fill="url(#g-ao)"/>
+      <g clip-path="url(#clip-neck)">
+        <ellipse cx="18" cy="45" rx="9" ry="12.5" fill="url(#g-belly)" opacity=".95" transform="rotate(-8 18 45)"/>
+      </g>
+      <circle cx="36.5" cy="31" r="1.4" fill="#39592f" opacity=".6"/>
+      <circle cx="39" cy="38" r="1.1" fill="#39592f" opacity=".5"/>
+
+      <!-- candlestick antenna: the "tick" in SyntheTick doubles as the bot signifier -->
+      <circle cx="24.5" cy="-2.4" r="4.6" fill="url(#g-tickglow)"/>
+      <line x1="24.5" y1="-6.4" x2="24.5" y2="4.6" stroke="#f0a83c" stroke-width=".9" stroke-linecap="round"/>
+      <rect x="23.2" y="-4.6" width="2.6" height="4.4" rx=".8" fill="#f0a83c"/>
+      <path d="M27.2 -4.2 A 3.8 3.8 0 0 1 27.2 1.2" stroke="#f0a83c" stroke-width=".8" stroke-linecap="round" fill="none" opacity=".85"/>
+      <path d="M28.7 -5.7 A 6 6 0 0 1 28.7 2.7" stroke="#f0a83c" stroke-width=".7" stroke-linecap="round" fill="none" opacity=".5"/>
+
+      <!-- Dino head, ported from the app mascot (facing left) -->
+      <path d="M19 22 C18 28 20 33 24 35.5 C27 36.5 30.5 35 31 31.5 C31.5 27 29 23 25 21.5 Z" fill="url(#g-body)"/>
+      <ellipse cx="24.5" cy="13.5" rx="11.3" ry="9.8" fill="url(#g-head)"/>
+      <ellipse cx="12.5" cy="16" rx="7" ry="5" fill="url(#g-head)"/>
+      <ellipse cx="24.5" cy="13.5" rx="11.3" ry="9.8" fill="url(#g-ao)" opacity=".45"/>
+      <ellipse cx="14" cy="21.5" rx="7.6" ry="4.2" fill="url(#g-belly)" opacity=".95"/>
+      <path d="M7 18.5 C11 22.5 18 23.5 24.5 21 C21.5 25.5 12.5 26 8.2 22 C7.4 20.9 7 19.6 7 18.5 Z" fill="#22301c"/>
+      <path d="M9.1 19.9 L10 21.9 L11.2 20.4 L13.1 22.5 L14.4 20.9 L16.1 22.9 L17.6 21.2 L19.3 22.6 L20.9 20.9 L21.9 21.7 L22.9 20.4 C18 22.3 12.5 21.9 9.1 19.9 Z" fill="#f4f8f0"/>
+      <ellipse cx="8.9" cy="13.6" rx="1" ry=".55" fill="#2c4528" transform="rotate(-20 8.9 13.6)"/>
+      <ellipse cx="21" cy="7.5" rx="4.2" ry="2" fill="#fff" opacity=".32"/>
+      <path d="M21.5 5.8 Q26.5 3.8 31.2 6.4" stroke="#1c231e" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+      <circle cx="26.5" cy="11.5" r="4.6" fill="#fdfefb"/>
+      <circle cx="25.2" cy="12.2" r="2.9" fill="#1c231e"/>
+      <circle cx="24.2" cy="10.9" r="1.05" fill="#fff"/>
+      <circle cx="26.4" cy="13.5" r=".5" fill="#fff" opacity=".8"/>
+      <ellipse cx="32.5" cy="16.5" rx="1.8" ry="1.1" fill="#e8a9a0" opacity=".35"/>
+    </g>
+  </g>
+
+  <circle cx="256" cy="256" r="250" fill="none" stroke="rgba(232,228,216,.14)" stroke-width="2"/>
+</svg>

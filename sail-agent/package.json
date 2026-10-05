@@ -1,0 +1,21 @@
+{
+  "name": "sail-agent",
+  "version": "0.1.0",
+  "description": "Sail Protocol agent starter",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "ui": "node scripts/build-docs-ui.mjs && (node scripts/build-overview-data.mjs --loop 300 >/dev/null 2>&1 &) && SAIL_DIR=\"$PWD/.sail\" SERVE_DIST=1 PORT=3912 SAILOR_UI_DIST=\"$PWD/ui/dist\" node node_modules/@sail.money/sailor/packages/cli/dist/server.cjs",
+    "overview:data": "node scripts/build-overview-data.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "@sail.money/sailor": "^2.1.3"
+  }
+}

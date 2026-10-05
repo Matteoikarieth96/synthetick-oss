@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent overview | Sailor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0b0e14; color: #d7dce6; font: 15px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 36px 24px 80px; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .top a { color: #7aa2f7; text-decoration: none; font-size: 13px; }
+  .asof { font-size: 12px; color: #6b7484; }
+  h1 { font-size: 24px; color: #fff; margin: 8px 0 2px; }
+  h2 { font-size: 17px; color: #fff; margin: 0 0 12px; }
+  .sub { color: #8b95a7; font-size: 13px; margin: 0 0 24px; }
+  .sub code { color: #9ecbff; background: #161c28; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { background: #10151f; border: 1px solid #1c2434; border-radius: 12px; padding: 20px; }
+  .card.wide { grid-column: 1 / -1; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .kpis { display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 8px; }
+  .kpi .v { font-size: 22px; color: #fff; font-weight: 600; }
+  .kpi .l { font-size: 12px; color: #6b7484; }
+  .pie-row { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  .legend { font-size: 13px; flex: 1; min-width: 180px; }
+  .legend div { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { border-bottom: 1px solid #1c2434; padding: 8px 10px; text-align: left; white-space: nowrap; }
+  th { color: #8b95a7; font-weight: 500; font-size: 12px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl { overflow-x: auto; }
+  .pos { color: #7ee2a8; } .neg { color: #f7768e; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid #2a3550; }
+  .tag.buy { color: #7ee2a8; border-color: #234634; } .tag.sell { color: #f7768e; border-color: #4d2733; }
+  .tag.deposit { color: #7aa2f7; } .tag.withdrawal { color: #e0af68; }
+  a.tx { color: #7aa2f7; text-decoration: none; font-size: 12px; }
+  .log { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
+  .log li { padding: 9px 0; border-bottom: 1px solid #161d2b; display: flex; gap: 14px; }
+  .log .when { color: #6b7484; font-size: 12px; flex: none; width: 118px; padding-top: 1px; }
+  .log.scrolly { max-height: 330px; overflow-y: auto; }
+  .log a { color: #7aa2f7; text-decoration: none; }
+  .how p { margin: 8px 0; color: #b7c0d0; font-size: 14px; }
+  .how strong { color: #e6ebf5; }
+  .muted { color: #6b7484; font-size: 13px; }
+  .loglogo { width: 16px; height: 16px; border-radius: 4px; vertical-align: -3px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="/#/dashboard">← back to dashboard</a>
+    <span class="asof" id="asof">loading…</span>
+  </div>
+  <h1>Agent overview</h1>
+  <p class="sub">SyntheTick × Sail agent on Robinhood Chain · account <code id="sma"></code> · <a class="tx" id="explorer" target="_blank" rel="noreferrer">view on explorer</a></p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Portfolio</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="nav">-</div><div class="l">Net asset value</div></div>
+        <div class="kpi"><div class="v" id="cash">-</div><div class="l">Cash (USDG)</div></div>
+        <div class="kpi"><div class="v" id="invested">-</div><div class="l">Invested</div></div>
+        <div class="kpi"><div class="v" id="pl">-</div><div class="l">Unrealized P&amp;L</div></div>
+      </div>
+      <div class="pie-row">
+        <svg id="pie" width="170" height="170" viewBox="0 0 170 170"></svg>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Activity log</h2>
+      <ul class="log scrolly" id="log"></ul>
+      <p class="muted" id="lognote"></p>
+    </div>
+
+    <div class="card wide">
+      <h2>Positions</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Asset</th><th class="num">Tokens</th><th class="num">Price</th><th class="num">Day range</th><th class="num">Value</th><th class="num">Weight</th><th class="num">P&amp;L</th><th>Sector</th><th class="num">Market cap</th></tr></thead>
+        <tbody id="positions"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card wide">
+      <h2>Latest transactions</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>When</th><th>Type</th><th>Asset</th><th class="num">Tokens</th><th class="num">USD</th><th class="num">Price</th><th>Tx</th></tr></thead>
+        <tbody id="txs"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card wide how">
+      <h2>How this agent works</h2>
+      <p>Every weekday it reads the day&apos;s posts on X about the stocks it holds and watches, writes an <strong>investment thesis</strong>, enriches it with <strong>premium newsletter research</strong> (a few budget-capped Drip summaries a day) noting where research disagrees with the social flow, and screens the revised thesis against SyntheTick&apos;s Robinhood tokenized universe to find the most relevant assets.</p>
+      <p>A <strong>risk tier</strong> sizes every decision: a fixed % of the portfolio per trade, a daily trade limit and a conviction bar. Trades execute as Uniswap V3 swaps between USDG and the stock tokens.</p>
+      <p>The capital stays in a self-custodial Safe. A <strong>Sail mandate</strong> (permission contracts checked on-chain on every transaction) is what actually bounds the agent: allowlisted tokens and router, per-trade caps, a price sanity band, proceeds pinned to the account. Everything else is rejected by the chain itself.</p>
+      <p><a href="/how-it-works.html">Read the complete record →</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const PALETTE = ['#7aa2f7','#7ee2a8','#e0af68','#f7768e','#bb9af7','#7dcfff','#9ece6a','#ff9e64','#c0caf5','#565f89'];
+const usd = (v, d=2) => v == null ? '-' : '$' + v.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const big = (v) => v == null ? '-' : v >= 1e12 ? (v/1e12).toFixed(1)+'T' : v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6).toFixed(0)+'M' : String(Math.round(v));
+const when = (ts) => ts ? new Date(ts).toLocaleString('en-GB', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '-';
+// Everything from overview-data.json is data, never markup (security audit L14):
+// escaped for text AND attribute context, logos only from https URLs, tx hashes
+// only when they are real 32-byte hex hashes, links only to https explorers.
+const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const httpsUrl = (u) => { try { const x = new URL(String(u)); return x.protocol === 'https:' ? x.href : null; } catch { return null; } };
+const txHash = (h) => /^0x[0-9a-fA-F]{64}$/.test(String(h ?? '')) ? String(h) : null;
+const txLink = (h, label) => txHash(h) ? `<a class="tx" target="_blank" rel="noreferrer" href="https://robinhoodchain.blockscout.com/tx/${txHash(h)}">${esc(label)}</a>` : '-';
+
+function donut(slices) {
+  const C = 85, R = 62, W = 30, TAU = Math.PI * 2;
+  let a0 = -Math.PI / 2, out = '';
+  const total = slices.reduce((s, x) => s + x.v, 0) || 1;
+  for (const s of slices) {
+    const a1 = a0 + (s.v / total) * TAU;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const p = (a) => `${C + R * Math.cos(a)} ${C + R * Math.sin(a)}`;
+    if (s.v / total > 0.999) {
+      out += `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${s.c}" stroke-width="${W}"/>`;
+    } else if (s.v > 0) {
+      out += `<path d="M ${p(a0)} A ${R} ${R} 0 ${large} 1 ${p(a1)}" fill="none" stroke="${s.c}" stroke-width="${W}"/>`;
+    }
+    a0 = a1;
+  }
+  return out;
+}
+
+async function render() {
+  let d;
+  try { d = await (await fetch('./overview-data.json', {cache: 'no-store'})).json(); }
+  catch { document.getElementById('asof').textContent = 'no data yet: run npm run ui'; return; }
+
+  document.getElementById('asof').textContent = 'data as of ' + when(d.generatedAt);
+  document.getElementById('sma').textContent = d.sma;
+  const explorer = httpsUrl(d.explorer);
+  if (explorer) document.getElementById('explorer').href = explorer;
+
+  const P = d.portfolio;
+  const invested = P.positions.reduce((s, p) => s + p.valueUsd, 0);
+  const pl = P.positions.reduce((s, p) => s + (p.plUsd ?? 0), 0);
+  document.getElementById('nav').textContent = usd(P.navUsd);
+  document.getElementById('cash').textContent = usd(P.cashUsd);
+  document.getElementById('invested').textContent = usd(invested);
+  const plEl = document.getElementById('pl');
+  plEl.textContent = (pl >= 0 ? '+' : '') + usd(pl);
+  plEl.className = 'v ' + (pl >= 0 ? 'pos' : 'neg');
+
+  const slices = [{ n: 'Cash (USDG)', v: P.cashUsd, c: '#3b4261' },
+    ...P.positions.map((p, i) => ({ n: p.symbol, v: p.valueUsd, c: PALETTE[i % PALETTE.length] }))];
+  document.getElementById('pie').innerHTML = donut(slices) +
+    `<text x="85" y="82" text-anchor="middle" fill="#fff" font-size="17" font-weight="600">${usd(P.navUsd)}</text>` +
+    `<text x="85" y="100" text-anchor="middle" fill="#6b7484" font-size="10">NAV</text>`;
+  document.getElementById('legend').innerHTML = slices.map((s) =>
+    `<div><span class="dot" style="background:${s.c}"></span>${esc(s.n)} · ${usd(s.v)} (${P.navUsd > 0 ? (s.v / P.navUsd * 100).toFixed(1) : 0}%)</div>`).join('');
+
+  document.getElementById('positions').innerHTML = P.positions.map((p) => `<tr>
+    <td>${httpsUrl(p.logo) ? `<img class="loglogo" src="${esc(httpsUrl(p.logo))}" alt=""/>` : ''}<strong>${esc(p.symbol)}</strong> <span class="muted">${esc(p.name)}</span>${p.halted ? ' <span class="tag">halted</span>' : ''}</td>
+    <td class="num">${p.tokens.toFixed(6)}</td>
+    <td class="num">${usd(p.priceUsd)}</td>
+    <td class="num muted">${p.dayLow != null ? usd(p.dayLow, 0) + ' to ' + usd(p.dayHigh, 0) : '-'}</td>
+    <td class="num">${usd(p.valueUsd)}</td>
+    <td class="num">${p.weightPct.toFixed(1)}%</td>
+    <td class="num ${p.plUsd == null ? '' : p.plUsd >= 0 ? 'pos' : 'neg'}">${p.plUsd == null ? '-' : (p.plUsd >= 0 ? '+' : '') + usd(p.plUsd)}</td>
+    <td class="muted">${esc(p.sector ?? '-')}</td>
+    <td class="num muted">${big(p.marketCapUsd)}</td>
+  </tr>`).join('') || '<tr><td colspan="9" class="muted">No token positions, all cash.</td></tr>';
+
+  document.getElementById('txs').innerHTML = d.transactions.map((t) => `<tr>
+    <td class="muted">${when(t.ts)}</td>
+    <td><span class="tag ${/^[a-z]+$/.test(String(t.type)) ? t.type : ''}">${esc(t.type)}</span></td>
+    <td><strong>${esc(t.symbol)}</strong></td>
+    <td class="num">${typeof t.tokens === 'number' ? t.tokens.toFixed(6) : '-'}</td>
+    <td class="num">${usd(t.usd)}</td>
+    <td class="num muted">${usd(t.priceUsd)}</td>
+    <td>${txLink(t.txHash, `${String(t.txHash ?? '').slice(0, 10)}...`)}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="muted">No transactions yet.</td></tr>';
+
+  document.getElementById('log').innerHTML = d.activity.map((a) => `<li>
+    <span class="when">${when(a.ts)}</span>
+    <span>${esc(a.text)}${txHash(a.txHash) ? ` ${txLink(a.txHash, 'tx')}` : ''}</span>
+  </li>`).join('') || '<li class="muted">Nothing yet. The log fills as the agent runs.</li>';
+  document.getElementById('lognote').textContent =
+    'Compiled from onchain transfers, the daily pipeline reports and the local ledger. Days run in CI show their trades here (from the chain); their full reports live in the GitHub Actions run artifacts.';
+}
+render();
+setInterval(render, 60_000);
+</script>
+</body>
+</html>

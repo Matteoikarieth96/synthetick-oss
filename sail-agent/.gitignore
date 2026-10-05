@@ -1,0 +1,52 @@
+# Sailor project .gitignore. Real values, wallet material and secrets are never
+# committed. Keep it that way in forks: this file used to re-include the keystore
+# and account files for CI; it no longer does.
+
+# Dependencies & TypeScript build output
+node_modules/
+dist/
+.demo-build/
+*.tsbuildinfo
+
+# Foundry build outputs
+out/
+cache/
+broadcast/
+
+# Environment: never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Sail runtime state, encrypted keys and wallet-specific files
+.sail/keys/
+.sail/runtime/
+.sail/state/
+.sail/.env.local
+.sail/.wizard-state.json
+.sail/account.json
+.sail/mandate.json
+.sail/mandate-draft.json
+.sail/activity.jsonl
+.sail/deploy-args-*.json
+.sail/*.blob
+
+# Public placeholders and workspace docs that stay tracked
+!.sail/.gitkeep
+!.sail/config.json
+!.sail/account.example.json
+
+# Encrypted agent keystore. Export your own with `sailor keys export-ci`; it
+# must never be committed to a public repository.
+ci-keystore.json
+*keystore*.json
+
+# Mandate probe fixtures (encode the live Safe; regenerate with scripts/probe-mandate.mjs)
+probes-*.json
+
+# Agent runtime memory (plan + ledger) and daily reports: local run artifacts
+.sail/memory/
+reports/
+
+# Built dashboard (stock UI + docs page), rebuilt by scripts/build-docs-ui.mjs
+ui/dist/

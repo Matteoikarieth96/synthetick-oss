@@ -1,0 +1,77 @@
+<svg viewBox="0 0 1200 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
+  <title id="t">How to contribute to SyntheTick</title>
+  <desc id="d">Six steps from fork to merged pull request, and six areas where help is wanted.</desc>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#9aa39a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <style>
+      text{font-family:'Space Grotesk','Helvetica Neue',Arial,sans-serif;fill:#e8e4d8}
+      .mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+      .t{font-size:16px;font-weight:600}
+      .s{font-size:12.5px;fill:#9aa39a}
+      .box{fill:#131b17;stroke:rgba(232,228,216,.22);stroke-width:1.2}
+      .amb{fill:rgba(240,168,60,.12);stroke:#f0a83c;stroke-width:1.4}
+      .grn{fill:rgba(127,174,122,.12);stroke:#7fae7a;stroke-width:1.4}
+      .pur{fill:rgba(201,162,232,.12);stroke:#c9a2e8;stroke-width:1.4}
+      .n{font-size:13px;font-weight:700;fill:#0d1310}
+      .ln{stroke:#9aa39a;stroke-width:1.6;fill:none}
+    </style>
+  </defs>
+  <rect width="1200" height="560" rx="18" fill="#0d1310"/>
+  <text x="40" y="52" font-size="26" font-weight="700">Contribute in six steps</text>
+  <text x="40" y="76" class="s" style="font-size:14px">Start cheap: a free database, crypto data only, and a few cents of LLM credit per run.</text>
+
+  <g>
+    <rect class="box" x="40" y="108" width="172" height="150" rx="12"/>
+    <circle cx="64" cy="134" r="12" fill="#f0a83c"/><text class="n" x="60" y="139">1</text>
+    <text class="t" x="82" y="140">Fork + clone</text>
+    <text class="s mono" x="58" y="176" style="font-size:11px">git clone your-fork</text>
+    <text class="s" x="58" y="204">Node 22 or newer</text>
+    <text class="s" x="58" y="224">Free Supabase works</text>
+
+    <rect class="box" x="226" y="108" width="172" height="150" rx="12"/>
+    <circle cx="250" cy="134" r="12" fill="#f0a83c"/><text class="n" x="246" y="139">2</text>
+    <text class="t" x="268" y="140">Run it locally</text>
+    <text class="s mono" x="244" y="176" style="font-size:11px">npm run ingest:crypto</text>
+    <text class="s mono" x="244" y="196" style="font-size:11px">npm run dev</text>
+    <text class="s" x="244" y="224">Open localhost:8787</text>
+
+    <rect class="box" x="412" y="108" width="172" height="150" rx="12"/>
+    <circle cx="436" cy="134" r="12" fill="#f0a83c"/><text class="n" x="432" y="139">3</text>
+    <text class="t" x="454" y="140">Pick an issue</text>
+    <text class="s" x="430" y="176">Label "good first issue"</text>
+    <text class="s" x="430" y="196">or open one to discuss</text>
+    <text class="s" x="430" y="224">before big changes</text>
+
+    <rect class="box" x="598" y="108" width="172" height="150" rx="12"/>
+    <circle cx="622" cy="134" r="12" fill="#f0a83c"/><text class="n" x="618" y="139">4</text>
+    <text class="t" x="640" y="140">Branch + build</text>
+    <text class="s mono" x="616" y="176" style="font-size:11px">branch off staging</text>
+    <text class="s" x="616" y="204">Keep it small</text>
+    <text class="s" x="616" y="224">One change per PR</text>
+
+    <rect class="box" x="784" y="108" width="172" height="150" rx="12"/>
+    <circle cx="808" cy="134" r="12" fill="#f0a83c"/><text class="n" x="804" y="139">5</text>
+    <text class="t" x="826" y="140">Open the PR</text>
+    <text class="s mono" x="802" y="176" style="font-size:11px">target: staging</text>
+    <text class="s" x="802" y="204">CI runs typecheck</text>
+    <text class="s" x="802" y="224">and offline tests</text>
+
+    <rect class="grn" x="970" y="108" width="190" height="150" rx="12"/>
+    <circle cx="994" cy="134" r="12" fill="#7fae7a"/><text class="n" x="990" y="139">6</text>
+    <text class="t" x="1012" y="140">Review + ship</text>
+    <text class="s" x="988" y="176">A maintainer reviews</text>
+    <text class="s" x="988" y="204">staging is promoted</text>
+    <text class="s" x="988" y="224">to main when green</text>
+  </g>
+  <path class="ln" d="M212 183H222" marker-end="url(#ar)"/><path class="ln" d="M398 183H408" marker-end="url(#ar)"/><path class="ln" d="M584 183H594" marker-end="url(#ar)"/><path class="ln" d="M770 183H780" marker-end="url(#ar)"/><path class="ln" d="M956 183H966" marker-end="url(#ar)"/>
+
+  <text x="40" y="318" font-size="13" letter-spacing="1.8" font-weight="600" style="fill:#9aa39a">WHERE HELP IS WANTED</text>
+  <g>
+    <rect class="amb" x="40" y="336" width="350" height="92" rx="12"/><text class="t" x="58" y="366">Data source adapters</text><text class="s" x="58" y="390">Add a keyless or new vendor source.</text><text class="s" x="58" y="410">More exchanges, more countries.</text>
+    <rect class="amb" x="410" y="336" width="350" height="92" rx="12"/><text class="t" x="428" y="366">New asset classes</text><text class="s" x="428" y="390">Commodities, REITs, individual bonds,</text><text class="s" x="428" y="410">anything the universe does not cover yet.</text>
+    <rect class="amb" x="780" y="336" width="380" height="92" rx="12"/><text class="t" x="798" y="366">Tests</text><text class="s" x="798" y="390">Offline, no-key tests that guard the</text><text class="s" x="798" y="410">three requirement layers.</text>
+    <rect class="pur" x="40" y="444" width="350" height="92" rx="12"/><text class="t" x="58" y="474">Docs + translations</text><text class="s" x="58" y="498">Guides, examples, localisation.</text><text class="s" x="58" y="518">Fresh eyes find the gaps.</text>
+    <rect class="pur" x="410" y="444" width="350" height="92" rx="12"/><text class="t" x="428" y="474">API clients + MCP tools</text><text class="s" x="428" y="498">SDKs for Python and TypeScript.</text><text class="s" x="428" y="518">New tools for AI agents.</text>
+    <rect class="pur" x="780" y="444" width="380" height="92" rx="12"/><text class="t" x="798" y="474">Accessibility + frontend</text><text class="s" x="798" y="498">Keyboard use, contrast, mobile layout,</text><text class="s" x="798" y="518">screen reader labels.</text>
+  </g>
+</svg>

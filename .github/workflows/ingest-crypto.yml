@@ -1,0 +1,51 @@
+name: Ingest crypto (CoinGecko)
+
+# Nightly, 03:00 UTC (spec §4.2). Nightly runs refresh markets + a rolling
+# detail budget (demo key: 30 calls/min, 10k/month). Manual dispatch with a
+# larger detail_budget performs the one-time backfill.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      top_n:
+        description: 'Number of coins by market cap to ingest'
+        required: false
+        default: '3000'
+      detail_budget:
+        description: 'Max per-coin detail fetches this run'
+        required: false
+        default: '120'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest-crypto
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: github.repository == 'Matteoikarieth96/synthetick-oss'  # owner repo only; forks never run cron or spend secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run crypto ingest + embeddings
+        run: npm run ingest:crypto
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          VOYAGE_KEY: ${{ secrets.VOYAGE_KEY }}
+          COINGECKO_KEY: ${{ secrets.COINGECKO_KEY }}
+          CRYPTO_TOP_N: ${{ github.event.inputs.top_n || '3000' }}
+          # 120/night keeps this month under the 10k demo cap alongside the
+          # one-time backfill; can go back to ~200 next month.
+          CRYPTO_DETAIL_BUDGET: ${{ github.event.inputs.detail_budget || '120' }}

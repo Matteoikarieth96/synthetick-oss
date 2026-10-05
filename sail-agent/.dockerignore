@@ -1,0 +1,35 @@
+# Secrets and wallet-specific state: never bake into the image. Provide at
+# runtime (see Dockerfile).
+.sail/keys/
+.sail/runtime/
+.sail/state/
+.sail/.env.local
+.sail/account.json
+.sail/mandate.json
+.sail/mandate-draft.json
+.sail/deploy-args-*.json
+.sail/*.blob
+.sail/activity.jsonl
+ci-keystore.json
+*keystore*.json
+**/manager.json
+**/*.key
+**/*.pem
+probes-*.json
+.env
+.env.*
+!.env.example
+
+# Local run artifacts: daily guards, ledger, reports
+.sail/memory/
+reports/
+
+# VCS and build outputs
+.git/
+node_modules/
+out/
+cache/
+broadcast/
+dist/
+ui/dist/
+.demo-build/

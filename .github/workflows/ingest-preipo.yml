@@ -1,0 +1,49 @@
+name: Ingest pre-IPO (Sacra)
+
+# Disabled: no schedule runs. Stored pre-IPO rows are not refreshed, and the
+# runtime never calls the vendor (marketFor short-circuits on source='sacra').
+# Manual dispatch needs a valid SACRA_API_KEY under your own vendor license.
+#
+# Weekly, Monday 06:00 UTC (spec §4.2b). Sacra meters usage per company
+# touched (~2 tasks/name/run, ≈230/month at the default watchlist against the
+# Standard plan's 500) — do NOT raise the frequency without re-doing that
+# budget. Manual dispatch accepts a narrower domain list for testing.
+on:
+  # schedule:
+  #   - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      domains:
+        description: 'Comma-separated company domains (empty = default watchlist)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest-preipo
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: github.repository == 'Matteoikarieth96/synthetick-oss'  # owner repo only; forks never run cron or spend secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run pre-IPO ingest + embeddings
+        run: npm run ingest:preipo
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          VOYAGE_KEY: ${{ secrets.VOYAGE_KEY }}
+          SACRA_API_KEY: ${{ secrets.SACRA_API_KEY }}
+          PREIPO_DOMAINS: ${{ github.event.inputs.domains || '' }}

@@ -1,0 +1,14 @@
+{
+  "safe": "0xYourSafe0000000000000000000000000000000",
+  "owner": "0xYourOwner000000000000000000000000000000",
+  "permissionSigner": "0xYourOwner000000000000000000000000000000",
+  "manager": "0xYourManager0000000000000000000000000000",
+  "chainId": 4663,
+  "createdAtBlock": "0",
+  "txHash": "0xYourDeployTxHash",
+  "saltNonce": "0",
+  "deployedChains": [4663],
+  "managers": ["0xYourManager0000000000000000000000000000"],
+  "name": "SMA 1",
+  "addedAt": "1970-01-01T00:00:00.000Z"
+}

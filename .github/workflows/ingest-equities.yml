@@ -1,0 +1,38 @@
+name: Ingest equities (FMP)
+
+# Daily 01:00 UTC. FMP Ultimate has no daily credit quota (spec §4.1) — the run
+# backfills until the universe is complete, then only refreshes rows older than
+# 6 days (≈ weekly per asset). Manual dispatch also allowed.
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest-equities
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: github.repository == 'Matteoikarieth96/synthetick-oss'  # owner repo only; forks never run cron or spend secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run equities ingest + embeddings
+        run: npm run ingest:equities
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FMP_KEY: ${{ secrets.FMP_KEY }}
+          VOYAGE_KEY: ${{ secrets.VOYAGE_KEY }}

@@ -457,8 +457,21 @@ export function isCloudflareIp(ip: string): boolean {
 export function platformProxy(env: Record<string, string | undefined> = process.env): 'railway' | null {
   const v = (env.TRUST_PROXY ?? '').trim().toLowerCase();
   if (v === 'railway') return 'railway';
+  // On Railway a hop count is always wrong: with Cloudflare in front, counting
+  // from the right lands on a Cloudflare edge address, which would put every
+  // visitor in ONE bucket (one client could then 429 the whole site), and a
+  // direct caller could pick its own address. The edge semantics are known, so
+  // a numeric TRUST_PROXY is ignored there (warnRailwayTrustProxy says so).
+  if (env.RAILWAY_ENVIRONMENT?.trim()) return 'railway';
   if (trustedProxyHops(env) > 0) return null;
-  return env.RAILWAY_ENVIRONMENT?.trim() ? 'railway' : null;
+  return null;
+}
+
+/** Boot hint: a numeric TRUST_PROXY on Railway is ignored (see platformProxy). */
+export function warnRailwayTrustProxy(env: Record<string, string | undefined>, warn: (msg: string) => void): void {
+  if (env.RAILWAY_ENVIRONMENT?.trim() && trustedProxyHops(env) > 0) {
+    warn(`TRUST_PROXY=${env.TRUST_PROXY} is ignored on Railway: the client IP is detected automatically (edge address, or the Cloudflare visitor header). Remove the variable.`);
+  }
 }
 
 function headerValue(req: Pick<http.IncomingMessage, 'headers'>, name: string): string | undefined {

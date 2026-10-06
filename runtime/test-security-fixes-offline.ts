@@ -681,7 +681,7 @@ function emptyTableClient(rows: unknown[] = []) {
   r.restore(new Date(now).toISOString().slice(0, 10), 7);
   r.restore('2000-01-01', 9);
   check('L9 the persisted count survives a restart (today only)', r.postsToday === 7);
-  check('L9 X_BOT_MAX_REPLIES_PER_DAY, default 300', guards.ReplyBudget.fromEnv({}).maxPostsPerDay === 300 && guards.ReplyBudget.fromEnv({ X_BOT_MAX_REPLIES_PER_DAY: '50' }).maxPostsPerDay === 50);
+  check('L9 X_BOT_MAX_REPLIES_PER_DAY, default 100 (red-team M2: brand pays per post)', guards.ReplyBudget.fromEnv({}).maxPostsPerDay === 100 && guards.ReplyBudget.fromEnv({ X_BOT_MAX_REPLIES_PER_DAY: '50' }).maxPostsPerDay === 50);
   const worker = src('bot/worker.ts');
   check('L9 the worker checks the budget before charging and before every template', /if \(!budget\.canPost\(\)\)/.test(worker) && /templateAllowed\('no_credits'/.test(worker) && /templateAllowed\('run_failed'/.test(worker) && /templateAllowed\('unlinked'/.test(worker) && !/postReply\((UNLINKED_REPLY|NO_CREDITS_REPLY|RUN_FAILED_REPLY)/.test(worker));
 }

@@ -32,7 +32,12 @@ check('non-Cloudflare addresses are not', !isCloudflareIp('8.8.8.8') && !isCloud
 // ---- platform detection ----------------------------------------------------------
 check('Railway detected from RAILWAY_ENVIRONMENT', platformProxy(RAILWAY) === 'railway');
 check('TRUST_PROXY=railway forces it', platformProxy({ TRUST_PROXY: 'railway' }) === 'railway');
-check('an explicit hop count overrides detection', platformProxy({ ...RAILWAY, TRUST_PROXY: '2' }) === null);
+check('a numeric TRUST_PROXY is ignored on Railway (red-team H1)', platformProxy({ ...RAILWAY, TRUST_PROXY: '2' }) === 'railway' && platformProxy({ ...RAILWAY, TRUST_PROXY: '1' }) === 'railway');
+check('a hop count still works off Railway', platformProxy({ TRUST_PROXY: '2' }) === null);
+{
+  const viaCf2 = clientIp(req('100.64.0.1', { 'x-forwarded-for': '172.64.10.20, 100.64.0.9', 'cf-connecting-ip': '203.0.113.7' }), { ...RAILWAY, TRUST_PROXY: '2' });
+  check('with TRUST_PROXY=2 on Railway visitors still get their own bucket, not the Cloudflare edge', viaCf2.ip === '203.0.113.7' && viaCf2.source === 'cloudflare', viaCf2);
+}
 check('no platform outside Railway', platformProxy({}) === null);
 
 // ---- client IP on Railway ----------------------------------------------------------

@@ -183,7 +183,7 @@ const uniRecord = (over: Partial<UniverseAssetRecord> = {}): UniverseAssetRecord
         out.ticker === 'AAPL' && out.sector === 'Technology' && out.region === 'us' &&
         (equity ? out.marketCapUsd === 3e12 && out.metrics !== null && out.spark30d !== null && out.asOf === '2026-10-01' : out.marketCapUsd === null && out.metrics === null && out.spark30d === null && out.asOf === null) &&
         (dexOk ? (out.dex as { priceUsd: number }).priceUsd === 201.5 : out.dex === null) &&
-        (dexOk && channel === 'api' ? (out.dex as { attribution?: string }).attribution === policy.ATTRIBUTION.geckoterminal : !out.dex || (out.dex as { attribution?: string }).attribution === undefined) &&
+        (dexOk ? (out.dex as { attribution?: string }).attribution === policy.ATTRIBUTION.geckoterminal : !out.dex) &&
         (f.fmp && (channel === 'web' || f.apiRelay) ? out.about === 'VENDOR-FMP-TEXT about Apple.' : out.about === 'OWN-TEXT Apple themes: devices, services.') &&
         (equity ? out.logo !== null : out.logo === null) &&
         out.quote !== null && out.onchain !== null && Array.isArray(out.events);

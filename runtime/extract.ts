@@ -323,8 +323,10 @@ export function stripHtml(html: string): string {
       // lines — dropChromeLines depends on this to spot repeated boilerplate.
       .replace(/<\/(p|div|li|h[1-6]|section|article|blockquote|tr|figcaption)>/gi, '\n'),
   )
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&\w+;/g, ' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&(?!amp;)\w+;/g, ' ')
+    // &amp; last: decoding it first would turn "&amp;lt;" into "<" (double unescape).
+    .replace(/&amp;/g, '&')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n\s*/g, '\n')
     .trim();

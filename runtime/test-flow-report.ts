@@ -121,7 +121,7 @@ interface FlowResult {
 }
 
 function esc(s: string | null | undefined): string {
-  return (s ?? '').replace(/\|/g, '\\|').replace(/\n+/g, ' ').trim();
+  return (s ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n+/g, ' ').trim();
 }
 
 function reqLabel(c: FlowCase): string {

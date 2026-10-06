@@ -6,8 +6,9 @@ function emit(level: Level, msg: string, extra?: unknown) {
   const tag = level.toUpperCase().padEnd(5);
   const line = `${ts} ${tag} ${msg}`;
   const stream = level === 'error' || level === 'warn' ? console.error : console.log;
-  if (extra !== undefined) stream(line, extra);
-  else stream(line);
+  // '%s' keeps user-influenced text from acting as a format string.
+  if (extra !== undefined) stream('%s', line, extra);
+  else stream('%s', line);
 }
 
 export const log = {

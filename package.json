@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "SyntheTick v4 \u2014 investment-thesis matching platform (see signal-desk-v4-spec.md)",
+  "description": "SyntheTick v4 \u2014 investment-thesis matching platform (see SPEC.md)",
   "engines": {
     "node": ">=22"
   },

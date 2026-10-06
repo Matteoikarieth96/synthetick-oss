@@ -1,10 +1,16 @@
 <h1 align="center">SyntheTick</h1>
 <p align="center"><b>Turn an investment thesis into audited, evidence-backed picks, without invented numbers.</b><br>
 Open source, MIT licensed. Live at <a href="https://synthetick.org">synthetick.org</a>.</p>
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/Matteoikarieth96/synthetick-oss"></a>
+  <a href="https://github.com/Matteoikarieth96/synthetick-oss/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Matteoikarieth96/synthetick-oss/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/Matteoikarieth96/synthetick-oss/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Matteoikarieth96/synthetick-oss"></a>
+  <a href="https://github.com/Matteoikarieth96/synthetick-oss/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"><img alt="Good first issues" src="https://img.shields.io/github/issues/Matteoikarieth96/synthetick-oss/good%20first%20issue?label=good%20first%20issues"></a>
+</p>
 
 <p align="center">
   <a href="docs/assets/synthetick-explainer.mp4"><img src="docs/assets/explainer-thumb.png" alt="Watch the 80 second explainer video" width="640"></a><br>
-  <sub>About 80 seconds, silent whiteboard explainer with captions (MP4). Made with AI assistance: script draft and drawings by Claude Code (whiteboard-video skill), reviewed by the maintainer.</sub>
+  <sub>Click to watch: about 80 seconds, silent with captions (MP4). Made with AI assistance: script draft and drawings by Claude Code (whiteboard-video skill), reviewed by the maintainer.</sub>
 </p>
 
 You paste a thesis, an article, a tweet or a PDF. SyntheTick pulls out the idea and the rules you set
@@ -33,7 +39,7 @@ real market data. It is a **research starting point, not investment advice**.
 | `sail-agent/` | Experimental autonomous agent that trades tokenized stocks. **Can move real funds.** Separate from the app, read its README first |
 | `docs/` | [Documentation](docs/DOCUMENTATION.md), [API and MCP](docs/API.md), [quickstart](docs/QUICKSTART.md), test reports |
 
-The single source of truth for behaviour is [signal-desk-v4-spec.md](signal-desk-v4-spec.md). When code and spec disagree, the spec wins; if you change a decision, change the spec first.
+The single source of truth for behaviour is [SPEC.md](SPEC.md). When code and spec disagree, the spec wins; if you change a decision, change the spec first.
 
 ## Run it
 

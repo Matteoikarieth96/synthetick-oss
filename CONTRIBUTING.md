@@ -4,7 +4,7 @@ Thanks for helping. This file is the short path from "I want to change something
 
 ## Ground rules
 
-1. **The spec is the source of truth.** [signal-desk-v4-spec.md](signal-desk-v4-spec.md) describes intended behaviour. When code and spec disagree, the spec wins. If your change alters a decision, update the spec in the same pull request, first.
+1. **The spec is the source of truth.** [SPEC.md](SPEC.md) describes intended behaviour. When code and spec disagree, the spec wins. If your change alters a decision, update the spec in the same pull request, first.
 2. **The honesty contract is not negotiable.** Requirements are enforced three times, empty results are honest, missing data is a dash. A change that weakens any of those will not be merged. Tests for them live in `runtime/test-regression.ts`.
 3. **No secrets, no vendor data.** Never commit `.env`, keys, wallet files or payloads from a paid data vendor. A secret scan runs on every push.
 4. **Data sources need a terms check.** A new vendor adapter must say, in the pull request, what its terms allow and confirm that the repository does not redistribute its data.

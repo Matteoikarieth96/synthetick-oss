@@ -1,6 +1,6 @@
 # SyntheTick — Service Documentation
 
-> Version: v4 (M1–M4 complete; M5 hardening shipped except cost telemetry and a stricter CSP, see §8) · Spec: [`signal-desk-v4-spec.md`](../signal-desk-v4-spec.md)
+> Version: v4 (M1–M4 complete; M5 hardening shipped except cost telemetry and a stricter CSP, see §8) · Spec: [`SPEC.md`](../SPEC.md)
 
 SyntheTick turns any investment thesis — pasted text, an article, notes, or a
 PDF — into a researched, audited list of up to 10 real assets, matched against

@@ -106,6 +106,7 @@ import {
   originLockRefuses,
   describeProxyShape,
   platformProxy,
+  warnRailwayTrustProxy,
 } from './ratelimit.js';
 import { PublicError, runFailureNotes, toPublicError, withRunFailureNotes, type ErrorCode } from '../runtime/errors.js';
 import {
@@ -1384,6 +1385,7 @@ server.listen(PORT, bindHost(), () => {
   );
   if (isDeployedEnv() && !authEnabled()) log.warn('ALLOW_OPEN_ACCESS=1: running a deployed server WITHOUT auth, credits or per-user limits.');
   warnIfTrustProxyUnset(process.env, log.warn, isDeployedEnv());
+  warnRailwayTrustProxy(process.env, log.warn);
   if (platformProxy() === 'railway') {
     log.info('client IP: automatic on Railway (edge address, or the Cloudflare visitor header when the edge address is Cloudflare)');
   }

@@ -15,7 +15,7 @@
  * shorter one that aborts its model calls and refunds, and a drained event
  * loop or an escaped error exits with code 1 so the platform restarts the
  * worker. Cost (L9): template replies once per author per UTC day and a global
- * daily cap on posts (X_BOT_MAX_REPLIES_PER_DAY, default 300).
+ * daily cap on posts (X_BOT_MAX_REPLIES_PER_DAY, default 100).
  */
 import { assetsFromContent } from '../runtime/assets.js';
 import { extractLink } from '../runtime/extract.js';

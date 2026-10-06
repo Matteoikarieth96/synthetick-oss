@@ -6,8 +6,7 @@ name: Ingest metrics (data queries)
 # asset_metrics. Every family is best-effort: a vendor outage leaves the
 # previous night's values in place rather than emptying a ranking.
 on:
-  schedule:
-    - cron: '0 3 * * *'
+  # Scheduled in the maintainers' deployment only; run it manually or add your own schedule.
   workflow_dispatch:
 
 permissions:

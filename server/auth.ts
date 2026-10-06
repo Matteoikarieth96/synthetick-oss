@@ -83,10 +83,15 @@ export function isAcceptedSessionUser(user: SessionUserFacts, allowed: string[] 
   return providers.some((p) => allowed.includes(p));
 }
 
+/** Authorization: Bearer <token>. Tokens never contain whitespace, so \S+ cannot
+ * overlap the separator and matching stays linear on a hostile header (the old
+ * /^Bearer\s+(.+)$/i took about 0.4 s on 16 KB of spaces: CodeQL js/polynomial-redos). */
+export const BEARER_RE = /^Bearer[ \t]+(\S+)[ \t]*$/i;
+
 /** Resolve the Bearer token to a Supabase user; null = missing/invalid, or
  * not an accepted sign-in (anonymous, or a provider other than Google). */
 export async function userFromRequest(req: http.IncomingMessage): Promise<AuthedUser | null> {
-  const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? '');
+  const m = BEARER_RE.exec(req.headers.authorization ?? '');
   if (!m) return null;
   const { data, error } = await supabase.auth.getUser(m[1]);
   if (error || !data.user) return null;

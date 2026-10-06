@@ -826,5 +826,24 @@ function emptyTableClient(rows: unknown[] = []) {
   check('test-bot uses a placeholder handle', !/@elon/.test(src('runtime/test-bot.ts')) && /@example_user/.test(src('runtime/test-bot.ts')));
 }
 
+// ==== CodeQL follow-ups (2026-10-06) =============================================
+{
+  const { BEARER_RE } = await import('../server/auth.js');
+  const hostile = 'Bearer' + ' '.repeat(16000) + '\n';
+  const t0 = Date.now();
+  BEARER_RE.exec(hostile);
+  const ms = Date.now() - t0;
+  check('CodeQL redos: Authorization parsing is linear on 16 KB of spaces', ms < 50, `${ms} ms`);
+  check('CodeQL redos: a normal bearer token still parses', BEARER_RE.exec('Bearer abc.def-ghi_123')?.[1] === 'abc.def-ghi_123');
+  check('CodeQL redos: case and trailing spaces tolerated', BEARER_RE.exec('bearer   tok  ')?.[1] === 'tok');
+  check('CodeQL redos: a token with inner spaces is refused', BEARER_RE.exec('Bearer a b') === null);
+
+  const { stripHtml } = await import('./extract.js');
+  check('CodeQL double-escaping: entities decode once', stripHtml('<p>a &amp;lt;b&amp;gt; c &amp; d</p>') === 'a &lt;b&gt; c & d', stripHtml('<p>a &amp;lt;b&amp;gt; c &amp; d</p>'));
+
+  const logSrc = src('ingest/lib/log.ts');
+  check('CodeQL format string: log lines are passed as data, not as a format', /stream\('%s', line, extra\)/.test(logSrc) && /stream\('%s', line\)/.test(logSrc));
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED');
 process.exit(failures ? 1 : 0);

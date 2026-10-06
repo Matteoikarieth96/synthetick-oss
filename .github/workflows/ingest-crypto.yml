@@ -4,8 +4,7 @@ name: Ingest crypto (CoinGecko)
 # detail budget (demo key: 30 calls/min, 10k/month). Manual dispatch with a
 # larger detail_budget performs the one-time backfill.
 on:
-  schedule:
-    - cron: '0 3 * * *'
+  # Scheduled in the maintainers' deployment only; run it manually or add your own schedule.
   workflow_dispatch:
     inputs:
       top_n:

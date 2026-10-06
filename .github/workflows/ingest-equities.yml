@@ -4,8 +4,7 @@ name: Ingest equities (FMP)
 # backfills until the universe is complete, then only refreshes rows older than
 # 6 days (≈ weekly per asset). Manual dispatch also allowed.
 on:
-  schedule:
-    - cron: '0 1 * * *'
+  # Scheduled in the maintainers' deployment only; run it manually or add your own schedule.
   workflow_dispatch:
 
 permissions:

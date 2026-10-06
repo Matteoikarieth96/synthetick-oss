@@ -9,8 +9,6 @@ name: Ingest pre-IPO (Sacra)
 # Standard plan's 500) — do NOT raise the frequency without re-doing that
 # budget. Manual dispatch accepts a narrower domain list for testing.
 on:
-  # schedule:
-  #   - cron: '0 6 * * 1'
   workflow_dispatch:
     inputs:
       domains:

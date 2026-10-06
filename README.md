@@ -8,15 +8,14 @@ Open source, MIT licensed. Live at <a href="https://synthetick.org">synthetick.o
   <a href="https://github.com/Matteoikarieth96/synthetick-oss/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"><img alt="Good first issues" src="https://img.shields.io/github/issues/Matteoikarieth96/synthetick-oss/good%20first%20issue?label=good%20first%20issues"></a>
 </p>
 
-<p align="center">
-  <a href="docs/assets/synthetick-explainer.mp4"><img src="docs/assets/explainer-thumb.png" alt="Watch the 80 second explainer video" width="640"></a><br>
-  <sub>Click to watch: about 80 seconds, silent with captions (MP4). Made with AI assistance: script draft and drawings by Claude Code (whiteboard-video skill), reviewed by the maintainer.</sub>
-</p>
+![SyntheTick in 80 seconds: idea in, audited assets out](docs/assets/synthetick-explainer.gif)
+
+[Watch the full video (MP4)](docs/assets/synthetick-explainer.mp4). It is silent, with captions, and was made with [whiteboard-video](https://github.com/Matteoikarieth96/whiteboard-video-skill), an open-source Claude Code skill that turns any topic into a hand-drawn explainer.
 
 You paste a thesis, an article, a tweet or a PDF. SyntheTick pulls out the idea and the rules you set
 ("only crypto", "European ETFs only", "no defense"), searches a universe of stocks, ETFs, bond funds, crypto and selected
 pre-IPO companies, ranks up to ten assets with a 0 to 100 alignment score and a reason, audits every pick twice, and attaches
-real market data. It is a **research starting point, not investment advice**.
+real market data where the data licence allows it. It is a **research starting point, not investment advice**.
 
 ## The honesty contract
 

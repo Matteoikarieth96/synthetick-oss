@@ -10,17 +10,22 @@
  * change what a run costs, they only stop abuse bursts. All defaults can be
  * overridden by env (see LIMIT_DEFS).
  *
- * Client IP: derived from the socket. X-Forwarded-For is trusted ONLY when
- * TRUST_PROXY is set to the number of proxies in front of the app (1 = one
- * proxy such as Railway's edge: take the rightmost entry; 2 = Cloudflare in
- * front of Railway: take the second from the right). Trusting the header
- * without a proxy would let any client pick its own IP and dodge the limiter,
- * so the default is the raw socket address.
+ * Client IP: derived from the socket unless a proxy is known.
+ *  - On Railway (RAILWAY_ENVIRONMENT is set, or TRUST_PROXY=railway) the edge
+ *    strips any incoming X-Forwarded-For and writes the address that connected
+ *    to it as the FIRST entry, so that entry cannot be forged. When it belongs to
+ *    Cloudflare's published ranges the request came through Cloudflare and the
+ *    visitor is in CF-Connecting-IP; otherwise the first entry is the visitor
+ *    (someone calling Railway directly) and a forged CF-Connecting-IP is ignored.
+ *  - Elsewhere, X-Forwarded-For is trusted ONLY when TRUST_PROXY is a hop count
+ *    (1 = take the rightmost entry, 2 = the second from the right).
+ * Trusting the header without a known proxy would let any client pick its own
+ * IP and dodge the limiter, so the default is the raw socket address.
  *
  * Pure module (no env.ts import): the security gate tests it offline.
  */
 import type http from 'node:http';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import { PublicError } from '../runtime/errors.js';
 import { isLoopbackAddress, isPrivateAddress } from '../runtime/netguard.js';
 
@@ -394,8 +399,77 @@ function normalizeIp(ip: string): string {
 
 export interface ClientIp {
   ip: string;
-  /** True when the address came from X-Forwarded-For under TRUST_PROXY. */
+  /** True when the address came from a trusted proxy header, not the socket. */
   viaProxy: boolean;
+  /** Where the address came from. */
+  source: 'socket' | 'xff' | 'railway' | 'cloudflare';
+  /** True when the address is a shared proxy edge, not a visitor: never bucket it. */
+  shared?: boolean;
+}
+
+/**
+ * Cloudflare's published edge ranges (https://www.cloudflare.com/ips-v4/ and
+ * https://www.cloudflare.com/ips-v6/, fetched 2026-10-06). They change rarely;
+ * refresh this list when Cloudflare announces a change.
+ */
+export const CLOUDFLARE_RANGES: Readonly<{ v4: readonly string[]; v6: readonly string[] }> = {
+  v4: [
+    '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+    '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+    '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+  ],
+  v6: ['2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'],
+};
+
+const cloudflareNets = new BlockList();
+for (const cidr of CLOUDFLARE_RANGES.v4) {
+  const [net, bits] = cidr.split('/');
+  cloudflareNets.addSubnet(net!, Number(bits), 'ipv4');
+}
+for (const cidr of CLOUDFLARE_RANGES.v6) {
+  const [net, bits] = cidr.split('/');
+  cloudflareNets.addSubnet(net!, Number(bits), 'ipv6');
+}
+
+// Railway's internal proxies live in 100.0.0.0/8 (wider than the CGNAT /10 that
+// isPrivateAddress knows) and in its private IPv6 network (fd00::/8).
+const railwayInternalNets = new BlockList();
+railwayInternalNets.addSubnet('100.0.0.0', 8, 'ipv4');
+railwayInternalNets.addSubnet('fd00::', 8, 'ipv6');
+
+/** True when the peer is a Railway internal proxy (or any private address). */
+function isRailwayPeer(ip: string): boolean {
+  const v = isIP(ip);
+  return isPrivateAddress(ip) || (v !== 0 && railwayInternalNets.check(ip, v === 6 ? 'ipv6' : 'ipv4'));
+}
+
+/** True when the address belongs to Cloudflare's edge. */
+export function isCloudflareIp(ip: string): boolean {
+  const v = isIP(ip);
+  return v !== 0 && cloudflareNets.check(ip, v === 6 ? 'ipv6' : 'ipv4');
+}
+
+/**
+ * The platform proxy whose header semantics are known: 'railway' when running
+ * on Railway (RAILWAY_ENVIRONMENT, set by Railway itself) or when TRUST_PROXY is
+ * 'railway'. An explicit TRUST_PROXY hop count overrides the detection.
+ */
+export function platformProxy(env: Record<string, string | undefined> = process.env): 'railway' | null {
+  const v = (env.TRUST_PROXY ?? '').trim().toLowerCase();
+  if (v === 'railway') return 'railway';
+  if (trustedProxyHops(env) > 0) return null;
+  return env.RAILWAY_ENVIRONMENT?.trim() ? 'railway' : null;
+}
+
+function headerValue(req: Pick<http.IncomingMessage, 'headers'>, name: string): string | undefined {
+  const raw = req.headers[name];
+  return Array.isArray(raw) ? raw.join(',') : raw;
+}
+
+/** First X-Forwarded-For entry, normalised, when it is a valid IP. */
+function firstForwarded(req: Pick<http.IncomingMessage, 'headers'>): string | null {
+  const first = headerValue(req, 'x-forwarded-for')?.split(',')[0]?.trim();
+  return first && isIP(first) ? normalizeIp(first) : null;
 }
 
 /**
@@ -408,6 +482,17 @@ export function clientIp(
   env: Record<string, string | undefined> = process.env,
 ): ClientIp {
   const socketIp = normalizeIp(req.socket?.remoteAddress ?? 'unknown');
+  // Railway: only when the request really arrives from Railway's internal proxy.
+  if (platformProxy(env) === 'railway' && isRailwayPeer(socketIp)) {
+    const hop = firstForwarded(req);
+    if (hop) {
+      if (!isCloudflareIp(hop)) return { ip: hop, viaProxy: true, source: 'railway' };
+      const cf = headerValue(req, 'cf-connecting-ip')?.trim();
+      if (cf && isIP(cf)) return { ip: normalizeIp(cf), viaProxy: true, source: 'cloudflare' };
+      // Through Cloudflare but without its visitor header: the hop is a shared edge.
+      return { ip: hop, viaProxy: true, source: 'cloudflare', shared: true };
+    }
+  }
   const hops = trustedProxyHops(env);
   if (hops > 0) {
     const raw = req.headers['x-forwarded-for'];
@@ -415,10 +500,45 @@ export function clientIp(
     if (header) {
       const parts = header.split(',').map((s) => s.trim()).filter(Boolean);
       const pick = parts[parts.length - hops];
-      if (pick && isIP(pick)) return { ip: normalizeIp(pick), viaProxy: true };
+      if (pick && isIP(pick)) return { ip: normalizeIp(pick), viaProxy: true, source: 'xff' };
     }
   }
-  return { ip: socketIp, viaProxy: false };
+  return { ip: socketIp, viaProxy: false, source: 'socket' };
+}
+
+/**
+ * ORIGIN_LOCK=cloudflare (off by default): on Railway, refuse requests that did
+ * not come through Cloudflare (the first X-Forwarded-For hop is not a Cloudflare
+ * address), so nobody can skip Cloudflare by calling the Railway domain. Requests
+ * without the header (Railway's own health checks) are not affected.
+ */
+export function originLockRefuses(
+  req: Pick<http.IncomingMessage, 'headers' | 'socket'>,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  if ((env.ORIGIN_LOCK ?? '').trim().toLowerCase() !== 'cloudflare') return false;
+  if (platformProxy(env) !== 'railway') return false;
+  const hop = firstForwarded(req);
+  return hop !== null && !isCloudflareIp(hop);
+}
+
+/**
+ * One line describing how the proxy headers look, for checking the client-IP
+ * setup in the deployment logs. Counts and yes/no only, never an address.
+ */
+export function describeProxyShape(
+  req: Pick<http.IncomingMessage, 'headers' | 'socket'>,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const xff = headerValue(req, 'x-forwarded-for');
+  const entries = xff ? xff.split(',').filter((s) => s.trim()).length : 0;
+  const hop = firstForwarded(req);
+  const c = clientIp(req, env);
+  return (
+    `proxy headers: x-forwarded-for entries=${entries}, first hop is Cloudflare=${hop ? (isCloudflareIp(hop) ? 'yes' : 'no') : 'n/a'}, ` +
+    `cf-connecting-ip present=${headerValue(req, 'cf-connecting-ip') ? 'yes' : 'no'}, peer private=${isPrivateAddress(normalizeIp(req.socket?.remoteAddress ?? '')) ? 'yes' : 'no'}, ` +
+    `client ip source=${c.source}${c.shared ? ' (shared edge, not bucketed)' : ''}`
+  );
 }
 
 /**
@@ -454,7 +574,7 @@ export function warnIfTrustProxyUnset(
   warn: (msg: string) => void,
   deployed: boolean,
 ): void {
-  if (!deployed || trustedProxyHops(env) > 0) return;
+  if (!deployed || trustedProxyHops(env) > 0 || platformProxy(env) === 'railway') return;
   warn(
     'TRUST_PROXY is not set: if a proxy sits in front of this server, per-IP rate limits are OFF because every ' +
       'request arrives from the proxy\'s private address. Set TRUST_PROXY to the number of proxies in front of it: ' +
@@ -475,8 +595,9 @@ export function consumeIp(
   req: Pick<http.IncomingMessage, 'headers' | 'socket'>,
   warn: (msg: string) => void = () => {},
 ): void {
-  const { ip, viaProxy } = clientIp(req);
-  if (!viaProxy && isPrivateAddress(ip)) {
+  const { ip, viaProxy, shared } = clientIp(req);
+  if (shared) return; // a shared proxy edge is not one visitor: per-user limits still apply
+  if (!viaProxy && (isPrivateAddress(ip) || (platformProxy() === 'railway' && isRailwayPeer(ip)))) {
     if (!warnedSharedIp && (process.env.NODE_ENV === 'production' || !isLoopbackAddress(ip))) {
       warnedSharedIp = true;
       warn(

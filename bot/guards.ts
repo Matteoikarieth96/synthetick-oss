@@ -93,7 +93,7 @@ const utcDate = (t: number) => new Date(t).toISOString().slice(0, 10);
  * template replies (pointer for unlinked authors, out of credits, run failed)
  * cost no credit, so a script could make the brand account post them without
  * limit. Each template goes to an author at most once per UTC day, and the
- * worker stops posting at all once X_BOT_MAX_REPLIES_PER_DAY (default 300)
+ * worker stops posting at all once X_BOT_MAX_REPLIES_PER_DAY (default 100)
  * posts went out today. The per-author memory is in process (the unlinked
  * pointer also has its database check); the daily count is persisted by the
  * worker in bot_state, so a restart does not reset it.
@@ -110,10 +110,10 @@ export class ReplyBudget {
     this.day = utcDate(this.now());
   }
 
-  /** Default cap from X_BOT_MAX_REPLIES_PER_DAY (positive integer), else 300. */
+  /** Default cap from X_BOT_MAX_REPLIES_PER_DAY (positive integer), else 100. */
   static fromEnv(env: Record<string, string | undefined> = process.env, now?: () => number): ReplyBudget {
     const n = Number(env.X_BOT_MAX_REPLIES_PER_DAY);
-    return new ReplyBudget(Number.isInteger(n) && n > 0 ? n : 300, now);
+    return new ReplyBudget(Number.isInteger(n) && n > 0 ? n : 100, now);
   }
 
   private roll(): void {

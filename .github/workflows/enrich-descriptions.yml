@@ -6,8 +6,7 @@ name: Enrich descriptions (thematic context)
 # Scheduled Tuesdays 05:00 UTC but gated to EVEN ISO weeks → effectively
 # every other Tuesday. Manual dispatch always runs.
 on:
-  schedule:
-    - cron: '0 5 * * 2'
+  # Scheduled in the maintainers' deployment only; run it manually or add your own schedule.
   workflow_dispatch:
     inputs:
       top_n:

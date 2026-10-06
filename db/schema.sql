@@ -1,5 +1,5 @@
 -- SyntheTick v4 — database schema (spec §3)
--- Source of truth: signal-desk-v4-spec.md §3. If this diverges from the spec,
+-- Source of truth: SPEC.md §3. If this diverges from the spec,
 -- update the spec first, then this file.
 
 -- Extensions -----------------------------------------------------------------

@@ -92,6 +92,7 @@ import {
 } from '../runtime/display-policy.js';
 import { handleMcp } from './mcp.js';
 import { assertAuthConfigured, bindHost, isDeployedEnv, refuseDevRequest, refuseOpenModeRequest } from './access.js';
+import { startAuthHygiene, supabaseAuthAdmin } from './auth-hygiene.js';
 import {
   acquireExtractSlot,
   actorKey,
@@ -102,6 +103,9 @@ import {
   tryConsume,
   warnIfTrustProxyUnset,
   type LimitName,
+  originLockRefuses,
+  describeProxyShape,
+  platformProxy,
 } from './ratelimit.js';
 import { PublicError, runFailureNotes, toPublicError, withRunFailureNotes, type ErrorCode } from '../runtime/errors.js';
 import {
@@ -1258,6 +1262,9 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse, url: U
   const method = req.method ?? 'GET';
   applyCors(req, res, path);
 
+  // ORIGIN_LOCK=cloudflare: on Railway, only traffic that came through Cloudflare.
+  if (originLockRefuses(req)) return sendError(res, 403, 'forbidden', 'Use the public site address.');
+
   // Development: loopback Host and Origin only, on EVERY path (final audit
   // L1): pages and Next's dev endpoints used to reach Next before this check,
   // so a DNS-rebinding page could load them.
@@ -1330,8 +1337,19 @@ await nextApp.prepare();
 
 // Header/request timeouts, keep-alive and a connection cap (final audit L7):
 // they bound RECEIVING a request only, so a run's SSE stream stays open.
+// The first few distinct proxy-header shapes go to the log (counts and yes/no
+// only), so the client-IP setup can be checked on the deployment.
+const seenProxyShapes = new Set<string>();
+
 const server = http.createServer(httpServerOptions(), async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
+  if (seenProxyShapes.size < 5 && req.headers['x-forwarded-for']) {
+    const shape = describeProxyShape(req);
+    if (!seenProxyShapes.has(shape)) {
+      seenProxyShapes.add(shape);
+      log.info(shape);
+    }
+  }
   setSecurityHeaders(res);
   try {
     return await route(req, res, url);
@@ -1366,10 +1384,15 @@ server.listen(PORT, bindHost(), () => {
   );
   if (isDeployedEnv() && !authEnabled()) log.warn('ALLOW_OPEN_ACCESS=1: running a deployed server WITHOUT auth, credits or per-user limits.');
   warnIfTrustProxyUnset(process.env, log.warn, isDeployedEnv());
+  if (platformProxy() === 'railway') {
+    log.info('client IP: automatic on Railway (edge address, or the Cloudflare visitor header when the edge address is Cloudflare)');
+  }
   // Self-hosting hint: clients only ever see a generic "provider unavailable" for
   // upstream failures, so say loudly here what is not configured.
   if (!process.env.OPENROUTER_API_KEY?.trim()) {
     log.warn('OPENROUTER_API_KEY is not set: research runs will fail until you add it to .env (see docs/QUICKSTART.md).');
   }
   startUniverseWarmer();
+  // Google-only sign-in: remove accounts the API would never accept (hourly, deployed only).
+  if (authEnabled()) startAuthHygiene(supabaseAuthAdmin(supabase as never), process.env, isDeployedEnv(), log);
 });

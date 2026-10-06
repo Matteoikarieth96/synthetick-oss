@@ -37,6 +37,9 @@ pdf.js is served by your own server (from the `pdfjs-dist` package), so PDF read
 
 ## Retention and deletion
 
+Accounts the API never accepts (anything that is not a Google sign-in, for example an email sign-up left enabled in the Supabase dashboard) are removed automatically, hourly, once they are an hour old. Admins are never removed. See `server/auth-hygiene.ts`.
+
+
 Nothing is deleted automatically. Pick a retention period and run it on a schedule, for example 90 days for prompts:
 
 ```sql

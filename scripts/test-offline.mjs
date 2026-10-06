@@ -31,6 +31,7 @@ const suites = [
   // API_RELAY_MARKET_DATA): every flag x channel x vendor, the run payload end
   // to end, prompt hygiene, universe payload, self-hosted pdf.js, frontend fixes.
   'runtime/test-display-policy-offline.ts',
+  'runtime/test-proxy-and-hygiene-offline.ts',
   // sail-agent: runs on its own sources only (no viem/Sailor imports), so it
   // needs no install inside sail-agent/.
   'sail-agent/test/offline.test.ts',

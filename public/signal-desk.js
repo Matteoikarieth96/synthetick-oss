@@ -1,3 +1,40 @@
+// ---- UI language (issue #17) ----
+// The catalogs come from app/i18n/*.json through the non-executable
+// <script type="application/json" id="sd-i18n"> block in layout.tsx. The saved
+// language is untrusted input: anything but a known code means English. Keys
+// are looked up with Object.hasOwn so 'constructor' or '__proto__' fall back
+// to English instead of reaching Object.prototype. Values are plain text:
+// innerHTML templates wrap sdT() in esc(), static nodes swap with textContent.
+// The helpers carry an sd prefix: this is a classic script sharing the page's
+// global scope, and Next's own scripts already declare short globals such as
+// t, so a top-level `const t` stops the whole file with a SyntaxError.
+const LANG_KEY='sd-lang';
+const LANGS=['en','it'];
+const I18N=(()=>{ try{ return JSON.parse(document.getElementById('sd-i18n')?.textContent||'{}')||{} }catch{ return {} } })();
+const safeLang=(v)=>LANGS.includes(v)?v:'en';
+let uiLang=safeLang((()=>{ try{ return localStorage.getItem(LANG_KEY) }catch{ return null } })());
+function sdMsg(l, key){
+  const cat=Object.hasOwn(I18N, l)?I18N[l]:null;
+  return cat && Object.hasOwn(cat, key) && typeof cat[key]==='string' ? cat[key] : null;
+}
+/** Translate key into language l, filling {name} placeholders from vars. */
+function sdTr(l, key, vars){
+  const s=sdMsg(l, key) ?? sdMsg('en', key) ?? key;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k)=>Object.hasOwn(vars, k) ? String(vars[k]) : m) : s;
+}
+const sdT=(key, vars)=>sdTr(uiLang, key, vars);
+// The PDF report stays in English (html lang="en"); its labels use sdTEn.
+const sdTEn=(key, vars)=>sdTr('en', key, vars);
+/** Count-dependent copy: key.one for 1, key.other otherwise. */
+const sdTn=(key, count, vars)=>sdT(`${key}.${count===1?'one':'other'}`, {count, ...vars});
+const uiNum=(n)=>Number(n).toLocaleString(uiLang==='it'?'it-IT':'en-US');
+// Static nodes from page.tsx: data-i18n swaps the text, data-i18n-<attr> an attribute.
+const I18N_ATTRS=['placeholder','aria-label','title'];
+function applyI18nNodes(root=document){
+  root.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=sdT(el.dataset.i18n); });
+  I18N_ATTRS.forEach(a=>root.querySelectorAll(`[data-i18n-${a}]`).forEach(el=>{ el.setAttribute(a, sdT(el.getAttribute(`data-i18n-${a}`))); }));
+}
+
 const feed = document.getElementById('feed');
 // Each research renders inside its own .run-view container so an in-flight
 // run keeps painting (and completing, and persisting to Recents) after the
@@ -72,8 +109,8 @@ function renderSrcChips(){
     const c = document.createElement('button');
     c.className = 'chip'; c.type = 'button';
     c.style.color = 'var(--amber)'; c.style.borderColor = 'rgba(240,168,60,.4)';
-    c.textContent = `${s.label} · ${s.text.length.toLocaleString()} characters · Remove`;
-    c.title = 'Remove this source';
+    c.textContent = sdT('composer.source.chip', { label: s.label, count: uiNum(s.text.length) });
+    c.title = sdT('composer.source.remove');
     c.onclick = () => { sources.splice(i, 1); renderSrcChips(); refreshReady(); };
     el.appendChild(c);
   });
@@ -86,12 +123,12 @@ function addSource(label, text, note, meta){
 }
 
 async function loadLinkSource(url){
-  fileName.textContent = 'Opening link. This can take about 30 seconds.';
+  fileName.textContent = sdT('composer.status.openingLink');
   const res = await apiFetch('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ kind: 'link', url }) });
   const j = await res.json();
-  if (!res.ok) throw new Error(j.error || 'Could not read that link.');
-  addSource(j.label, j.text, j.approximate ? 'Web search reconstructed this source. Review the thesis before continuing.' : '', {kind:'link', url});
+  if (!res.ok) throw new Error(j.error || sdT('composer.error.link'));
+  addSource(j.label, j.text, j.approximate ? sdT('composer.status.approximate') : '', {kind:'link', url});
   return j;
 }
 
@@ -167,11 +204,11 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
   e.target.value = '';
   try {
     if (file.type === 'application/pdf') {
-      fileName.textContent = 'Reading ' + file.name + '…';
+      fileName.textContent = sdT('composer.status.reading', { name: file.name });
       const buf = await file.arrayBuffer();
       let pdfjsLib;
       try { pdfjsLib = await loadPdfjs(); }
-      catch { throw new Error('The PDF reader could not be loaded. Try again in a moment.'); }
+      catch { throw new Error(sdT('composer.error.pdfReader')); }
       const doc = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise;
       let txt = ''; const max = Math.min(doc.numPages, 20);
       for (let i = 1; i <= max; i++) {
@@ -179,11 +216,11 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
         const c = await pg.getTextContent();
         txt += c.items.map((it) => it.str).join(' ') + '\n';
       }
-      if (txt.trim().length < 20) throw new Error('No readable text was found in that PDF.');
+      if (txt.trim().length < 20) throw new Error(sdT('composer.error.pdfEmpty'));
       addSource(file.name, txt.trim(), '', {kind:'file'});
     } else if (file.type.startsWith('image/')) {
-      if (file.size > 5 * 1024 * 1024) throw new Error('The image exceeds the 5 MB limit.');
-      fileName.textContent = 'Reading ' + file.name + '…';
+      if (file.size > 5 * 1024 * 1024) throw new Error(sdT('composer.error.imageSize'));
+      fileName.textContent = sdT('composer.status.reading', { name: file.name });
       const b64 = await new Promise((ok, ko) => {
         const r = new FileReader();
         r.onload = () => ok(String(r.result).split(',')[1]);
@@ -192,12 +229,12 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
       const res = await apiFetch('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ kind: 'image', media_type: file.type, data: b64 }) });
       const j = await res.json();
-      if (!res.ok) throw new Error(j.error || 'Could not extract text from that image.');
+      if (!res.ok) throw new Error(j.error || sdT('composer.error.image'));
       addSource(file.name + ' (screenshot)', j.text, '', {kind:'file'});
     } else if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
       await transcribeAudio(await file.arrayBuffer(), file.name);
     } else {
-      fileName.textContent = '⚠ Unsupported file type: ' + (file.type || file.name.split('.').pop());
+      fileName.textContent = '⚠ ' + sdT('composer.error.fileType', { type: file.type || file.name.split('.').pop() });
     }
   } catch (err) {
     fileName.textContent = '⚠ ' + err.message;
@@ -228,24 +265,24 @@ function wavBase64(mono){
 }
 
 async function transcribeAudio(arrayBuf, label){
-  fileName.textContent = 'Preparing audio…';
+  fileName.textContent = sdT('composer.status.preparingAudio');
   const AC = window.AudioContext || window.webkitAudioContext;
   const ac = new AC();
   let decoded;
   try { decoded = await ac.decodeAudioData(arrayBuf); }
-  catch { throw new Error('Could not read that audio. For a video, add its link instead.'); }
+  catch { throw new Error(sdT('composer.error.audio')); }
   finally { ac.close(); }
-  if (decoded.duration > MAX_AUDIO_SEC) throw new Error(`The audio is ${Math.round(decoded.duration / 60)} minutes long. The limit is ${MAX_AUDIO_SEC / 60} minutes.`);
-  if (decoded.duration < 1) throw new Error('The recording is too short.');
+  if (decoded.duration > MAX_AUDIO_SEC) throw new Error(sdT('composer.error.audioLong', { minutes: Math.round(decoded.duration / 60), limit: MAX_AUDIO_SEC / 60 }));
+  if (decoded.duration < 1) throw new Error(sdT('composer.error.audioShort'));
   const rate = 16000; // speech-recognition standard; shrinks the upload too
   const oc = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
   const src = oc.createBufferSource(); src.buffer = decoded; src.connect(oc.destination); src.start();
   const data = wavBase64(await oc.startRendering());
-  fileName.textContent = `Transcribing ${label} (${Math.round(decoded.duration)} seconds)…`;
+  fileName.textContent = sdT('composer.status.transcribing', { label, seconds: Math.round(decoded.duration) });
   const res = await apiFetch('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ kind: 'audio', media_type: 'audio/wav', data }) });
   const j = await res.json();
-  if (!res.ok) throw new Error(j.error || 'Could not transcribe that recording.');
+  if (!res.ok) throw new Error(j.error || sdT('composer.error.transcribe'));
   addSource(`${label} (voice note)`, j.text, '', {kind:'voice'});
 }
 
@@ -256,11 +293,12 @@ const STOP_ICON = '<span class="stop-dot" aria-hidden="true"></span>';
 function paintRecIdle(){
   recBtn.innerHTML = MIC_ICON;
   recBtn.classList.remove('is-recording');
-  recBtn.setAttribute('aria-label', 'Record a voice note');
-  recBtn.title = 'Record a voice note';
+  recBtn.setAttribute('aria-label', sdT('composer.record'));
+  recBtn.title = sdT('composer.record');
 }
+const recClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function paintRecRecording(seconds){
-  const label = `Stop recording (${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')})`;
+  const label = sdT('composer.record.stop', { time: recClock(seconds) });
   recBtn.innerHTML = STOP_ICON;
   recBtn.classList.add('is-recording');
   recBtn.setAttribute('aria-label', label);
@@ -278,12 +316,12 @@ recBtn.addEventListener('click', async () => {
     // tell the user to move to a real browser tab instead of "check permission".
     fileName.textContent =
       err.name === 'NotAllowedError'
-        ? 'Microphone access is blocked. Open this page in Chrome or Safari, then allow microphone access in the address bar.'
+        ? sdT('composer.mic.blocked')
         : err.name === 'NotFoundError' || err.name === 'OverconstrainedError'
-          ? 'No microphone was found. You can upload a voice recording with Add file.'
+          ? sdT('composer.mic.missing')
           : err.name === 'SecurityError'
-            ? 'Recording requires a secure connection. Open the app at http://localhost.'
-            : 'Microphone unavailable: ' + (err.message || err.name);
+            ? sdT('composer.mic.insecure')
+            : sdT('composer.mic.unavailable', { reason: err.message || err.name });
     return;
   }
   const chunks = [];
@@ -304,7 +342,7 @@ recBtn.addEventListener('click', async () => {
   const tick = () => {
     const s = Math.floor((Date.now() - t0) / 1000);
     paintRecRecording(s);
-    fileName.textContent = `Recording ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}. Select the microphone to stop.`;
+    fileName.textContent = sdT('composer.record.status', { time: recClock(s) });
     if (s >= MAX_AUDIO_SEC && rec) rec.stop();
   };
   tick(); recTimer = setInterval(tick, 1000);
@@ -483,22 +521,26 @@ function portfolioBlock(p){
   </div>`;
 }
 
-const assetLabel=(xs)=>xs?.length?xs.map(x=>({stock:'Stocks',crypto:'Crypto',etf:'ETFs',bond:'Bonds',private:'Pre IPO',polymarket:'Polymarket'}[x]||x)).join(' + '):'Full universe';
-const regionLabel=(xs)=>xs?.length?xs.map(x=>({us:'US',eu:'Europe',cn:'China',it:'Italy',other:'Intl',global:'Global'}[x]||x)).join(' / '):'Any market';
-const dirLabel=(d)=>d==='short'?'Short':d==='both'?'Both sides':'Long';
+// Labels take the translator so the English PDF report can pass sdTEn; values
+// with no catalog entry (an unknown kind or region code) show as is.
+const ASSET_CODES=['stock','crypto','etf','bond','private','polymarket'];
+const REGION_CODES=['us','eu','cn','it','other','global'];
+const assetLabel=(xs,tt=sdT)=>xs?.length?xs.map(x=>ASSET_CODES.includes(x)?tt(`label.asset.${x}`):x).join(' + '):tt('label.asset.none');
+const regionLabel=(xs,tt=sdT)=>xs?.length?xs.map(x=>REGION_CODES.includes(x)?tt(`label.region.${x}`):x).join(' / '):tt('label.region.none');
+const dirLabel=(d,tt=sdT)=>tt(d==='short'?'label.dir.short':d==='both'?'label.dir.both':'label.dir.long');
 // Mirrors the Screen settings selectors (2026-07-13): same categories, same
 // live state — every seg click repaints this bar via repaintParse().
-function parseSummary(t){
+function parseSummary(th){
   const picks=(key,allVal)=>((typeof cardCrit!=='undefined'&&cardCrit?.[key])||[]).filter(v=>v!==allVal);
   const caps=picks('cap_set',CAP_ALL);
-  const capLabel=caps.length?caps.map(c=>({low:'Low',medium:'Mid',high:'High'}[c]||c)).join(' + '):'All sizes';
-  const showBreadth=(t.strategies||[]).length>=2 && (t.direction||'long')!=='both';
+  const capLabel=caps.length?caps.map(c=>SEG_CAPS.includes(c)?sdT(`review.cap.${c}`):c).join(' + '):sdT('label.cap.all');
+  const showBreadth=(th.strategies||[]).length>=2 && (th.direction||'long')!=='both';
   return `<div class="parse-bar">
-    <div class="parse-item"><div class="k">Direction</div><div class="v">${dirLabel(t.direction)}</div></div>
-    ${showBreadth?`<div class="parse-item"><div class="k">Breadth</div><div class="v">${breadthMode==='diversified'?'Diversified':'Focused'}</div></div>`:''}
-    <div class="parse-item"><div class="k">Assets</div><div class="v">${assetLabel(picks('asset_set',ASSET_ALL))}</div></div>
-    <div class="parse-item"><div class="k">Markets</div><div class="v">${regionLabel(picks('region_set',REGION_GLOBAL))}</div></div>
-    <div class="parse-item"><div class="k">Market cap</div><div class="v">${capLabel}</div></div>
+    <div class="parse-item"><div class="k">${esc(sdT('review.direction'))}</div><div class="v">${esc(dirLabel(th.direction))}</div></div>
+    ${showBreadth?`<div class="parse-item"><div class="k">${esc(sdT('review.breadth'))}</div><div class="v">${esc(sdT(breadthMode==='diversified'?'review.breadth.diversified':'review.breadth.focused'))}</div></div>`:''}
+    <div class="parse-item"><div class="k">${esc(sdT('review.assets'))}</div><div class="v">${esc(assetLabel(picks('asset_set',ASSET_ALL)))}</div></div>
+    <div class="parse-item"><div class="k">${esc(sdT('review.markets'))}</div><div class="v">${esc(regionLabel(picks('region_set',REGION_GLOBAL)))}</div></div>
+    <div class="parse-item"><div class="k">${esc(sdT('review.cap'))}</div><div class="v">${esc(capLabel)}</div></div>
   </div>`;
 }
 function splitSentences(s){
@@ -533,30 +575,31 @@ function warningBadges(p, groupSize=1){
   if(p.kind==='crypto' && !(p.cex_venues||[]).length) w.push(['warn','limited exchange access']);
   return w.map(([cls,label])=>`<span class="badge ${cls}">${esc(label)}</span>`).join('');
 }
-const SORT_SELECT=`<label>Sort <select data-act="sort"><option value="rank">rank</option><option value="score">thesis fit</option><option value="cap">market cap</option><option value="move">30 day move</option></select></label>`;
+const SORT_KEYS=['rank','score','cap','move'];
+const sortSelect=()=>`<label>${esc(sdT('results.sort'))} <select data-act="sort">${SORT_KEYS.map(k=>`<option value="${k}">${esc(sdT(`results.sort.${k}`))}</option>`).join('')}</select></label>`;
 function basketMetrics(groups, dir){
   const picks=groups.flat();
   const kinds=[...new Set(picks.map(p=>p.kind))];
   const regions=[...new Set(picks.filter(p=>p.kind!=='crypto').map(p=>p.region))];
   const avg=picks.length?Math.round(picks.reduce((s,p)=>s+(Number(p.score)||0),0)/picks.length):0;
   const risks=[
-    groups.some(g=>g.length>1)?'duplicate listings':'',
+    groups.some(g=>g.length>1)?sdT('results.risk.duplicates'):'',
     // Data held back by the display policy is explained by the results note,
     // not flagged as a gap here.
-    picks.some(p=>!p.market_withheld && !p.market?.price)?'missing prices':'',
-    picks.some(p=>p.score<60)?'stretch fits':'',
-    dir==='short'?'borrow/squeeze risk':'',
-  ].filter(Boolean).join(', ') || 'standard diligence';
+    picks.some(p=>!p.market_withheld && !p.market?.price)?sdT('results.risk.prices'):'',
+    picks.some(p=>p.score<60)?sdT('results.risk.stretch'):'',
+    dir==='short'?sdT('results.risk.borrow'):'',
+  ].filter(Boolean).join(', ') || sdT('results.risk.none');
   return `<div class="basket-metrics">
-    <div><div class="k">Companies and listings</div><div class="v">${groups.length} / ${picks.length}</div></div>
-    <div><div class="k">Asset mix</div><div class="v">${assetLabel(kinds)}</div></div>
-    <div><div class="k">Markets</div><div class="v">${regionLabel(regions)}</div></div>
-    <div><div class="k">Average fit</div><div class="v">${avg}/100 · ${esc(risks)}</div></div>
+    <div><div class="k">${esc(sdT('results.metrics.companies'))}</div><div class="v">${groups.length} / ${picks.length}</div></div>
+    <div><div class="k">${esc(sdT('results.metrics.mix'))}</div><div class="v">${esc(assetLabel(kinds))}</div></div>
+    <div><div class="k">${esc(sdT('results.metrics.markets'))}</div><div class="v">${esc(regionLabel(regions))}</div></div>
+    <div><div class="k">${esc(sdT('results.metrics.fit'))}</div><div class="v">${avg}/100 · ${esc(risks)}</div></div>
   </div>`;
 }
 // Compact summary box (metrics only) — used by the multi-section result layouts.
 function basketSummary(groups, dir, opts){
-  const sortRow = opts?.withSort ? `<div class="basket-sort">${SORT_SELECT}</div>` : '';
+  const sortRow = opts?.withSort ? `<div class="basket-sort">${sortSelect()}</div>` : '';
   return `<section class="block basket${opts?.withSort?' has-sort':''}">${basketMetrics(groups, dir)}${sortRow}</section>`;
 }
 // Single-list results header as one card: title, recap, metrics and Sort all in
@@ -566,14 +609,14 @@ function resultsCard(groups, dir, heading, recap){
     <h2>${esc(heading)}</h2>
     <div class="recap">${esc(recap)}</div>
     ${basketMetrics(groups, dir)}
-    <div class="basket-sort">${SORT_SELECT}</div>
+    <div class="basket-sort">${sortSelect()}</div>
   </section>`;
 }
 function auditSummary(r){
   const lines=(r.statusLines||[]).filter(s=>/criteria check removed|audit removed|compliance audit removed/i.test(s));
   if(!lines.length) return '';
   return `<section class="block empty-state" style="text-align:left;border-style:solid">
-    <h3 style="display:flex;align-items:center;gap:9px">Criteria adjustments<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></h3>
+    <h3 style="display:flex;align-items:center;gap:9px">${esc(sdT('results.audit'))}<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></h3>
     <p>${lines.map(esc).join(' ')}</p>
   </section>`;
 }
@@ -586,12 +629,12 @@ function emptyResearchState(r){
   const isEtf=(r.crit?.asset_set||[]).includes('etf');
   const isEu=(r.crit?.region_set||[]).includes('eu');
   return `<section class="block empty-state">
-    <h3>Nothing matched your requirements</h3>
-    <p>No asset met every requirement. Widen one or more filters to run a broader screen.</p>
+    <h3>${esc(sdT('results.empty'))}</h3>
+    <p>${esc(sdT('results.empty.text'))}</p>
     <div class="empty-actions">
-      ${isEtf&&isEu?'<button type="button" data-empty-act="us-etf">Try US ETFs</button>':''}
-      <button type="button" data-empty-act="all-assets">Remove asset filter</button>
-      <button type="button" data-empty-act="all-markets">Search all markets</button>
+      ${isEtf&&isEu?`<button type="button" data-empty-act="us-etf">${esc(sdT('results.empty.usEtf'))}</button>`:''}
+      <button type="button" data-empty-act="all-assets">${esc(sdT('results.empty.allAssets'))}</button>
+      <button type="button" data-empty-act="all-markets">${esc(sdT('results.empty.allMarkets'))}</button>
     </div>
   </section>`;
 }
@@ -879,16 +922,14 @@ function initCardCritFromThesis(){
 // steps — 01 Your investment thesis, 02 Screen progress, 03 Results — each
 // with an info button that opens a short explainer of what the section does.
 const INFO_ICON='<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="5" r="1" fill="currentColor"/><rect x="7.3" y="7.1" width="1.4" height="4.4" rx=".7" fill="currentColor"/></svg>';
-const SEC_INFO={
-  thesis:'SyntheTick reads your input and builds this card: a summary of the thesis, its key themes ranked by search priority, and the screen settings. Everything here is editable, and it is what steers the screen.',
-  progress:'The screen runs in steps: apply your criteria, search the eligible universe, rank candidates by thesis fit, check every constraint, then load market data. Follow each step live here.',
-  results:'The assets that passed every check, ranked by thesis fit on an absolute 0 to 100 scale. Each card shows market data and 30 day price history where they can be shown, risks and trading venues, plus a downloadable report. Recent news is coming soon.'
-};
-function sectionHead(key, num, title, info){
+// key is thesis / progress / results: the title and explainer come from the
+// section.<key> and section.<key>.info catalog entries.
+function sectionHead(key, num){
+  const title=sdT(`section.${key}`), info=sdT(`section.${key}.info`);
   const el=document.createElement('section');
   el.className='block sec-head'; el.dataset.sec=key;
   el.innerHTML=`<span class="sec-num">${num}</span><span class="sec-title">${esc(title)}</span>
-    <span class="info-wrap"><button class="info-btn" type="button" aria-expanded="false" aria-label="About ${esc(title)}">${INFO_ICON}</button>
+    <span class="info-wrap"><button class="info-btn" type="button" aria-expanded="false" aria-label="${esc(sdT('section.about', {title}))}">${INFO_ICON}</button>
     <span class="info-pop" role="note">${esc(info)}</span></span><span class="sec-rule" aria-hidden="true"></span>`;
   const wrap=el.querySelector('.info-wrap'), btn=el.querySelector('.info-btn');
   btn.addEventListener('click',(e)=>{ e.stopPropagation(); const open=wrap.classList.toggle('open'); btn.setAttribute('aria-expanded',String(open)); });
@@ -962,7 +1003,7 @@ function statusBlock(kind='complete', onCancel){
         <button class="trace-nav" type="button" aria-label="Scroll next step">&rsaquo;</button>
       </div>
     </div>`;
-  el.prepend(sectionHead('progress','02','Screen progress',SEC_INFO.progress));
+  el.prepend(sectionHead('progress','02'));
   view.appendChild(el);
   const active=el.querySelector('.trace-active');
   const copy=el.querySelector('.trace-copy');
@@ -1097,12 +1138,14 @@ function finReqChips(){
   if(!finReq) return [];
   const out=[];
   (finReq.bounds||[]).forEach((b,i)=>out.push({id:`b${i}`, label:finReqLabel(b)}));
-  (finReq.exposures||[]).forEach((e,i)=>out.push({id:`e${i}`, label:`at least ${e.minWeightPct}% in ${e.name}`}));
-  if((finReq.currencies||[]).length) out.push({id:'cur', label:`listed in ${finReq.currencies.join(' or ')}`});
-  if((finReq.domiciles||[]).length) out.push({id:'dom', label:`domiciled in ${finReq.domiciles.join(' or ')}`});
+  (finReq.exposures||[]).forEach((e,i)=>out.push({id:`e${i}`, label:sdT('finreq.exposure', {pct:e.minWeightPct, name:e.name})}));
+  const or=` ${sdT('finreq.or')} `;
+  if((finReq.currencies||[]).length) out.push({id:'cur', label:sdT('finreq.currencies', {list:finReq.currencies.join(or)})});
+  if((finReq.domiciles||[]).length) out.push({id:'dom', label:sdT('finreq.domiciles', {list:finReq.domiciles.join(or)})});
   return out;
 }
-const FINREQ_LABELS={market_cap_usd:'market cap',pe:'P/E',forward_pe:'forward P/E',price_to_book:'price/book',price_to_sales:'price/sales',ev_to_ebitda:'EV/EBITDA',dividend_yield_pct:'dividend yield',revenue_growth_pct:'revenue growth',earnings_growth_pct:'earnings growth',gross_margin_pct:'gross margin',operating_margin_pct:'operating margin',net_margin_pct:'net margin',roe:'return on equity',roic:'return on invested capital',debt_to_equity:'debt/equity',net_debt_to_ebitda:'net debt/EBITDA',fcf_per_share:'free cash flow per share',fcf_yield_pct:'free cash flow yield',current_ratio:'current ratio',interest_coverage:'interest coverage',altman_z:'Altman Z-score',piotroski:'Piotroski score',beta:'beta',return_30d_pct:'30-day return',return_ytd_pct:'year-to-date return',return_1y_pct:'12-month return',avg_volume:'average daily volume',aum_usd:'AUM',ter_pct:'TER',track_record_years:'track record',fund_avg_volume:'average daily volume',holdings_count:'holdings'};
+// Metric names live in the catalogs as finreq.name.<key>; an unknown key shows as is.
+const finReqName=(key)=>sdMsg('en', `finreq.name.${key}`)!=null ? sdT(`finreq.name.${key}`) : String(key);
 const FINREQ_UNITS={market_cap_usd:'usd',aum_usd:'usd',ter_pct:'pct',dividend_yield_pct:'pct',revenue_growth_pct:'pct',earnings_growth_pct:'pct',gross_margin_pct:'pct',operating_margin_pct:'pct',net_margin_pct:'pct',fcf_yield_pct:'pct',return_30d_pct:'pct',return_ytd_pct:'pct',return_1y_pct:'pct',track_record_years:'years',avg_volume:'shares',fund_avg_volume:'shares'};
 function finReqValue(v,unit){
   if(unit==='usd'){ const a=Math.abs(v);
@@ -1111,24 +1154,24 @@ function finReqValue(v,unit){
     if(a>=1e6) return '$'+(v/1e6).toFixed(0)+'M';
     return '$'+v; }
   if(unit==='pct') return v+'%';
-  if(unit==='years') return v+(v===1?' year':' years');
+  if(unit==='years') return sdT(v===1?'finreq.year':'finreq.years', {n:v});
   if(unit==='shares') return v>=1e6?(v/1e6).toFixed(1)+'M':String(v);
   return String(v);
 }
 function finReqLabel(b){
-  const name=FINREQ_LABELS[b.key]||b.key, unit=FINREQ_UNITS[b.key]||'ratio';
-  if(b.min!=null&&b.max!=null) return `${name} ${finReqValue(b.min,unit)} to ${finReqValue(b.max,unit)}`;
-  if(b.min!=null) return `${name} at or above ${finReqValue(b.min,unit)}`;
-  return `${name} at or below ${finReqValue(b.max,unit)}`;
+  const name=finReqName(b.key), unit=FINREQ_UNITS[b.key]||'ratio';
+  if(b.min!=null&&b.max!=null) return sdT('finreq.range', {name, min:finReqValue(b.min,unit), max:finReqValue(b.max,unit)});
+  if(b.min!=null) return sdT('finreq.min', {name, value:finReqValue(b.min,unit)});
+  return sdT('finreq.max', {name, value:finReqValue(b.max,unit)});
 }
 function finReqBlock(){
   const chips=finReqChips();
   const cannot=(finReq?.unverifiable)||[];
   if(!chips.length&&!cannot.length) return '';
   return `<div class="th-section fin-req">
-    <div class="lbl lbl-hint" tabindex="0">Financial requirements<span class="lbl-pop">Read from your request and applied as hard filters. Remove one to widen the screen.</span></div>
-    ${chips.length?`<div class="crit-chips" id="finReqChips">${chips.map(c=>`<span class="crit" data-fr="${c.id}">${esc(c.label)}<button type="button" class="crit-x" data-fr="${c.id}" title="Remove this requirement" aria-label="Remove ${esc(c.label)}">×</button></span>`).join('')}</div>`:''}
-    ${cannot.length?`<div class="fin-req-note">Not applied, because we do not hold this data: ${esc(cannot.join('; '))}. These are left to the thesis match.</div>`:''}
+    <div class="lbl lbl-hint" tabindex="0">${esc(sdT('finreq'))}<span class="lbl-pop">${esc(sdT('finreq.hint'))}</span></div>
+    ${chips.length?`<div class="crit-chips" id="finReqChips">${chips.map(c=>`<span class="crit" data-fr="${c.id}">${esc(c.label)}<button type="button" class="crit-x" data-fr="${c.id}" title="${esc(sdT('finreq.remove'))}" aria-label="${esc(sdT('finreq.removeItem', {label:c.label}))}">×</button></span>`).join('')}</div>`:''}
+    ${cannot.length?`<div class="fin-req-note">${esc(sdT('finreq.notApplied', {items:cannot.join('; ')}))}</div>`:''}
   </div>`;
 }
 /** The requirement set as the card now stands, with removed chips stripped. */
@@ -1154,69 +1197,49 @@ function renderThesisReview(opts){
   // post empty text (400 "Missing document text or thesis") and paint its
   // progress and error onto the fresh home view (2026-07-14).
   const myView=view, myThesis=thesis, myDocText=opts?.docText??docText, myRunId=opts?.runId??currentRunId;
-  const t=thesis;
+  const th=thesis;
+  // One seg button per value; the label is review.<group>.<value>.
+  const segBtns=(group, values, attrs='type="button"')=>values.map(v=>`<button ${attrs} data-v="${v}">${esc(sdT(`review.${group}.${v}`))}</button>`).join('');
+  const DIR_BTN='style="font-family:var(--display);font-weight:600;font-size:13px;border:0;border-radius:7px;padding:7px 15px;cursor:pointer;background:transparent;color:var(--bone-dim)"';
   const card=document.createElement('section'); card.className='block thesis';
   card.innerHTML=`
-    <div class="th-h"><h3>${esc(t.title)}</h3></div>
-    ${parseSummary(t)}
-    <div class="th-sub lbl-hint" tabindex="0" style="padding-top:22px; color:var(--amber)">Investment thesis<span class="lbl-pop">A plain-language summary of your thesis. Edit it to change what the screen looks for.</span></div>
-    <div class="core" id="coreWrap"><p id="corePara">${esc(t.summary)}</p></div>
-    <div class="th-section th-themes"><div class="lbl lbl-hint" id="themesLbl" tabindex="0"><span id="themesLblText">Key themes. Ranked by search priority.</span><span class="lbl-pop">The sub ideas of your thesis. Order sets which ones are searched first.</span></div>
+    <div class="th-h"><h3>${esc(th.title)}</h3></div>
+    ${parseSummary(th)}
+    <div class="th-sub lbl-hint" tabindex="0" style="padding-top:22px; color:var(--amber)">${esc(sdT('review.thesis'))}<span class="lbl-pop">${esc(sdT('review.thesis.hint'))}</span></div>
+    <div class="core" id="coreWrap"><p id="corePara">${esc(th.summary)}</p></div>
+    <div class="th-section th-themes"><div class="lbl lbl-hint" id="themesLbl" tabindex="0"><span id="themesLblText">${esc(sdT('review.themes.ranked'))}</span><span class="lbl-pop">${esc(sdT('review.themes.hint'))}</span></div>
       <div id="themesWrap"></div></div>
-    ${(t.private_entities||[]).length?`<div class="th-section"><div class="lbl">Referenced entities that are not available as investments</div>
-      <div class="crit-chips">${t.private_entities.map(p=>`<span class="crit">${esc(p.name)}${p.note?` · <b>${esc(p.note)}</b>`:''}</span>`).join('')}</div>
-      <div style="font-size:12px; color:var(--bone-dim); margin-top:8px">These entities are private or outside the current universe. The screen will look for listed exposure through the themes above.</div></div>`:''}
-    <div class="th-sub lbl-hint" tabindex="0" style="padding-top:22px; color:var(--amber)">Screen settings<span class="lbl-pop">Direction, breadth, assets, markets and size. These filters shape which assets the screen returns.</span></div>
+    ${(th.private_entities||[]).length?`<div class="th-section"><div class="lbl">${esc(sdT('review.private'))}</div>
+      <div class="crit-chips">${th.private_entities.map(p=>`<span class="crit">${esc(p.name)}${p.note?` · <b>${esc(p.note)}</b>`:''}</span>`).join('')}</div>
+      <div style="font-size:12px; color:var(--bone-dim); margin-top:8px">${esc(sdT('review.private.note'))}</div></div>`:''}
+    <div class="th-sub lbl-hint" tabindex="0" style="padding-top:22px; color:var(--amber)">${esc(sdT('review.settings'))}<span class="lbl-pop">${esc(sdT('review.settings.hint'))}</span></div>
     <div class="th-section intent-row">
       <div class="setting-row">
-        ${hintLabel('Direction','Long buys the theme, Short bets against it, Both screens each side.',SETTING_ICONS.direction)}
+        ${hintLabel(sdT('review.direction'),sdT('review.direction.hint'),SETTING_ICONS.direction)}
         <span class="seg" id="dirSeg" style="display:inline-flex;background:var(--ink);border:1px solid var(--rule);border-radius:9px;padding:3px;gap:6px">
-          <button data-v="long" style="font-family:var(--display);font-weight:600;font-size:13px;border:0;border-radius:7px;padding:7px 15px;cursor:pointer;background:transparent;color:var(--bone-dim)">Long</button>
-          <button data-v="short" style="font-family:var(--display);font-weight:600;font-size:13px;border:0;border-radius:7px;padding:7px 15px;cursor:pointer;background:transparent;color:var(--bone-dim)">Short</button>
-          <button data-v="both" style="font-family:var(--display);font-weight:600;font-size:13px;border:0;border-radius:7px;padding:7px 15px;cursor:pointer;background:transparent;color:var(--bone-dim)">Both</button>
+          ${segBtns('direction',['long','short','both'],DIR_BTN)}
         </span>
       </div>
       <div class="setting-row" id="breadthWrap" hidden>
-        ${hintLabel('Breadth','Focused keeps the strongest matches. Diversified spreads results across themes.',SETTING_ICONS.breadth)}
-        <span class="seg" id="breadthSeg">
-          <button type="button" data-v="focused">Focused</button>
-          <button type="button" data-v="diversified">Diversified</button>
-        </span>
+        ${hintLabel(sdT('review.breadth'),sdT('review.breadth.hint'),SETTING_ICONS.breadth)}
+        <span class="seg" id="breadthSeg">${segBtns('breadth',['focused','diversified'])}</span>
       </div>
       <div class="setting-row">
-        ${hintLabel('Assets','Which asset classes to include. All screens the full universe.',SETTING_ICONS.assets)}
-        <span class="seg" id="assetSeg">
-          <button type="button" data-v="all">All</button>
-          <button type="button" data-v="stock">Stock</button>
-          <button type="button" data-v="crypto">Crypto</button>
-          <button type="button" data-v="etf">ETF</button>
-          <button type="button" data-v="private">Pre IPO</button>
-          <button type="button" data-v="polymarket">Polymarket</button>
-        </span>
+        ${hintLabel(sdT('review.assets'),sdT('review.assets.hint'),SETTING_ICONS.assets)}
+        <span class="seg" id="assetSeg">${segBtns('assets',[ASSET_ALL,...SEG_ASSETS])}</span>
       </div>
       <div class="setting-row">
-        ${hintLabel('Markets','Which stock markets to screen. Crypto is always global.',SETTING_ICONS.markets)}
-        <span class="seg" id="regionSeg">
-          <button type="button" data-v="global">Global</button>
-          <button type="button" data-v="us">USA</button>
-          <button type="button" data-v="eu">EU</button>
-          <button type="button" data-v="cn">China</button>
-          <button type="button" data-v="it">Italy</button>
-        </span>
+        ${hintLabel(sdT('review.markets'),sdT('review.markets.hint'),SETTING_ICONS.markets)}
+        <span class="seg" id="regionSeg">${segBtns('markets',[REGION_GLOBAL,...SEG_REGIONS])}</span>
       </div>
       <div class="setting-row">
-        ${hintLabel('Market cap','Company size band. Does not apply to ETFs or bonds.',SETTING_ICONS.cap)}
-        <span class="seg" id="capSeg">
-          <button type="button" data-v="all">All</button>
-          <button type="button" data-v="low">Low</button>
-          <button type="button" data-v="medium">Mid</button>
-          <button type="button" data-v="high">High</button>
-        </span>
+        ${hintLabel(sdT('review.cap'),sdT('review.cap.hint'),SETTING_ICONS.cap)}
+        <span class="seg" id="capSeg">${segBtns('cap',[CAP_ALL,...SEG_CAPS])}</span>
       </div>
       ${finReqBlock()}
     </div>
     `;
-  if(!view.querySelector('.sec-head[data-sec="thesis"]')) view.appendChild(sectionHead('thesis','01','Your investment thesis',SEC_INFO.thesis));
+  if(!view.querySelector('.sec-head[data-sec="thesis"]')) view.appendChild(sectionHead('thesis','01'));
   view.appendChild(card);
 
   // Removing a requirement chip widens the screen; the chip stays visible but
@@ -1225,8 +1248,8 @@ function renderThesisReview(opts){
     btn.addEventListener('click',()=>{
       const id=btn.getAttribute('data-fr');
       const chip=card.querySelector(`.crit[data-fr="${id}"]`);
-      if(finReqDropped.has(id)){ finReqDropped.delete(id); chip?.classList.remove('crit-off'); btn.textContent='×'; btn.title='Remove this requirement'; }
-      else { finReqDropped.add(id); chip?.classList.add('crit-off'); btn.textContent='+'; btn.title='Restore this requirement'; }
+      if(finReqDropped.has(id)){ finReqDropped.delete(id); chip?.classList.remove('crit-off'); btn.textContent='×'; btn.title=sdT('finreq.remove'); }
+      else { finReqDropped.add(id); chip?.classList.add('crit-off'); btn.textContent='+'; btn.title=sdT('finreq.restore'); }
     });
   });
 
@@ -1298,23 +1321,22 @@ function renderThesisReview(opts){
   let dragFrom=null;
   const paintThemes=()=>{
     const th=thesis.themes;
-    themesLbl.textContent=themesEditing
-      ? 'Key themes. Remove or reorder to change search priority.'
-      : 'Key themes. Ranked by search priority.';
+    themesLbl.textContent=sdT(themesEditing ? 'review.themes.editing' : 'review.themes.ranked');
+    const none=`<div class="tt-none">${esc(sdT('review.themes.none'))}</div>`;
     if(!themesEditing){
       const roChip=(x,i)=>`<span class="theme-tag tt-ro">${i<3?`<b class="tt-rank">${i+1}</b>`:''}${esc(x)}</span>`;
-      const editBtn=`<button type="button" class="tt-edit" id="themesEditBtn">Edit themes${th.length>3?` (${th.length-3} more)`:''}</button>`;
+      const editBtn=`<button type="button" class="tt-edit" id="themesEditBtn">${esc(th.length>3?sdT('review.themes.editMore', {count:th.length-3}):sdT('review.themes.edit'))}</button>`;
       themesWrap.innerHTML = th.length
         ? `<div class="theme-tags">${th.slice(0,3).map((x,i)=>roChip(x,i)).join('')}${editBtn}</div>`
-        : `<div class="tt-none">No themes selected. The thesis summary will drive the screen.</div>`;
+        : none;
       themesWrap.querySelector('#themesEditBtn')?.addEventListener('click',()=>{ themesEditing=true; paintThemes(); });
       return;
     }
-    const chip=(x,i)=>`<span class="theme-tag tt${i>=3?' tt-other':''}" draggable="true" data-i="${i}">${i>0?`<button type="button" class="tt-up" aria-label="Move theme earlier: ${esc(x)}">‹</button>`:''}${i<3?`<b class="tt-rank">${i+1}</b>`:''}${esc(x)}<button type="button" class="tt-x" aria-label="Remove theme: ${esc(x)}">×</button></span>`;
+    const chip=(x,i)=>`<span class="theme-tag tt${i>=3?' tt-other':''}" draggable="true" data-i="${i}">${i>0?`<button type="button" class="tt-up" aria-label="${esc(sdT('review.themes.moveUp', {theme:x}))}">‹</button>`:''}${i<3?`<b class="tt-rank">${i+1}</b>`:''}${esc(x)}<button type="button" class="tt-x" aria-label="${esc(sdT('review.themes.remove', {theme:x}))}">×</button></span>`;
     themesWrap.innerHTML = th.length
       ? `<div class="theme-tags">${th.slice(0,3).map((x,i)=>chip(x,i)).join('')}</div>`
-        + (th.length>3?`<div class="lbl tt-others">Other themes. Included at lower priority.</div><div class="theme-tags">${th.slice(3).map((x,j)=>chip(x,j+3)).join('')}</div>`:'')
-      : `<div class="tt-none">No themes selected. The thesis summary will drive the screen.</div>`;
+        + (th.length>3?`<div class="lbl tt-others">${esc(sdT('review.themes.others'))}</div><div class="theme-tags">${th.slice(3).map((x,j)=>chip(x,j+3)).join('')}</div>`:'')
+      : none;
     themesWrap.querySelectorAll('.tt').forEach(el=>{
       const i=+el.dataset.i;
       el.querySelector('.tt-x').addEventListener('click',()=>{ th.splice(i,1); paintThemes(); });
@@ -1367,22 +1389,22 @@ function renderThesisReview(opts){
   const paintRunning=(again)=>{
     card.querySelector('#thActions')?.remove();
     const act=document.createElement('div'); act.className='th-actions is-running'; act.id='thActions';
-    act.innerHTML=`<button class="btn-primary btn-running" id="continueBtn" type="button" disabled aria-busy="true">Screen progress<span class="ell" aria-hidden="true"><i></i><i></i><i></i></span></button>`
-      +(again?'':`<span class="run-note">The first screen runs automatically. You will be able to edit the investment thesis and run it again.</span>`);
+    act.innerHTML=`<button class="btn-primary btn-running" id="continueBtn" type="button" disabled aria-busy="true">${esc(sdT('review.action.running'))}<span class="ell" aria-hidden="true"><i></i><i></i><i></i></span></button>`
+      +(again?'':`<span class="run-note">${esc(sdT('review.action.runNote'))}</span>`);
     card.appendChild(act);
   };
   const paintActions=(again)=>{
     card.querySelector('#thActions')?.remove();
     const act=document.createElement('div'); act.className='th-actions'; act.id='thActions';
-    act.innerHTML=`<button class="btn-primary" id="continueBtn">${again?'Run updated screen':'Run screen'}</button>
-      <button class="btn-ghost" id="editBtn">Edit</button>`;
+    act.innerHTML=`<button class="btn-primary" id="continueBtn">${esc(sdT(again?'review.action.rerun':'review.action.run'))}</button>
+      <button class="btn-ghost" id="editBtn">${esc(sdT('review.action.edit'))}</button>`;
     card.appendChild(act);
     act.querySelector('#continueBtn').addEventListener('click',()=>run(again));
     act.querySelector('#editBtn').addEventListener('click',()=>{
       const wrap=card.querySelector('#coreWrap');
       wrap.innerHTML='<textarea id="coreEdit"></textarea>';
       const te=wrap.querySelector('#coreEdit'); te.value=thesis.summary; te.focus();
-      act.innerHTML='<button class="btn-primary" id="saveBtn">Save &amp; run</button><button class="btn-ghost" id="cancelBtn">Cancel</button>';
+      act.innerHTML=`<button class="btn-primary" id="saveBtn">${esc(sdT('review.action.saveRun'))}</button><button class="btn-ghost" id="cancelBtn">${esc(sdT('review.action.cancel'))}</button>`;
       act.querySelector('#saveBtn').addEventListener('click',()=>{
         thesis.summary=te.value.trim()||thesis.summary;
         wrap.innerHTML=`<p id="corePara">${esc(thesis.summary)}</p>`;
@@ -1700,8 +1722,8 @@ function reportExecSummary(r){
       <p>No asset met every criterion. Widen one or more filters to run a broader screen.</p>`;
   }
   const groups=groupByCompany(picks);
-  const kinds=assetLabel([...new Set(picks.map(p=>p.kind))]);
-  const regions=regionLabel([...new Set(picks.filter(p=>p.kind!=='crypto').map(p=>p.region))]);
+  const kinds=assetLabel([...new Set(picks.map(p=>p.kind))], sdTEn);
+  const regions=regionLabel([...new Set(picks.filter(p=>p.kind!=='crypto').map(p=>p.region))], sdTEn);
   const dir=t.direction||'long';
   const top=picks.slice().sort((a,b)=>(+b.score||0)-(+a.score||0))[0];
   const avg=Math.round(picks.reduce((s,p)=>s+(+p.score||0),0)/picks.length);
@@ -1857,7 +1879,7 @@ function reportHTML(r){
   const metaBits=[
     new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'}),
     (mode==='expert'?'Guided':'Quick')+' screen',
-    dirLabel(dir)+(r.pmOnly?' · prediction markets':picks.length?` · ${nCompanies} holding${nCompanies>1?'s':''}`:' · no holdings'),
+    dirLabel(dir, sdTEn)+(r.pmOnly?' · prediction markets':picks.length?` · ${nCompanies} holding${nCompanies>1?'s':''}`:' · no holdings'),
   ];
   // The disclaimer opens on a fresh page (r-break) so it is the report's
   // second page; later sections take their number from their position.
@@ -2110,27 +2132,27 @@ function renderStrategySections(r, dir){
   const other=r.picks.filter(p=>!p.strategy);
   if(other.length) sections.push({name:null, picks:other});
   const groupsAll=groupByCompany(r.picks);
-  view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2>${names.length} investment approaches</h2>
-    <div class="recap">${groupsAll.length} companies across ${r.picks.length} tradable listings. Results cover ${names.length} distinct strategies and are ranked on the same fit scale. Prices and 30 day history come from market data providers.</div></section>`);
+  view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2>${esc(sdT('results.strategies', {count:names.length}))}</h2>
+    <div class="recap">${esc(sdT('results.strategies.recap', {companies:groupsAll.length, listings:r.picks.length, count:names.length}))} ${esc(sdT('results.prices'))}</div></section>`);
   view.insertAdjacentHTML('beforeend', basketSummary(groupsAll, dir));
   sections.forEach(sec=>{
     const g=groupByCompany(sec.picks);
     const best=Math.max(...sec.picks.map(p=>p.score||0));
-    view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--amber)">${sec.name?esc(sec.name):'Other approaches'}</h2>
-      <div class="recap">${g.length} compan${g.length===1?'y':'ies'} · best fit ${best}/100${dir==='short'?' · short side':''}</div></section>`);
+    view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--amber)">${esc(sec.name||sdT('results.strategy.other'))}</h2>
+      <div class="recap">${esc(sdTn('results.strategy.recap', g.length, {best}))}${dir==='short'?` · ${esc(sdT('results.strategy.shortSide'))}`:''}</div></section>`);
     appendPickCards(g);
   });
 }
 
 function renderPredictionsSection(r){
   if(r.predictions?.length){
-    view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px">Prediction markets</h2>
-      <div class="recap">${r.predictions.length} live Polymarket contract${r.predictions.length>1?'s':''} tied to the thesis outcome. Prices are current market implied probabilities.</div></section>`);
+    view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px">${esc(sdT('results.pm'))}</h2>
+      <div class="recap">${esc(sdTn('results.pm.recap', r.predictions.length))}</div></section>`);
     r.predictions.forEach(b=>view.insertAdjacentHTML('beforeend', pmCard(b)));
   } else if(r.pmOnly){
     view.insertAdjacentHTML('beforeend', `<section class="block empty-state">
-      <h3>No related prediction markets</h3>
-      <p>No live Polymarket contract is closely tied to this thesis. A more specific event or outcome may produce better results.</p></section>`);
+      <h3>${esc(sdT('results.pm.none'))}</h3>
+      <p>${esc(sdT('results.pm.none.text'))}</p></section>`);
   }
 }
 
@@ -2149,7 +2171,7 @@ function jumpToEditInput(){
 }
 
 function render(r){
-  view.appendChild(sectionHead('results','03','Results',SEC_INFO.results));
+  view.appendChild(sectionHead('results','03'));
   const audit=auditSummary(r);
   if(audit) view.insertAdjacentHTML('beforeend', audit);
   // Data display policy (server-decided): one line when this run's market
@@ -2173,27 +2195,23 @@ function render(r){
     if (dir === 'both') {
       const longs = groupByCompany(r.picks.filter(p=>p.dir!=='short'));
       const shorts = groupByCompany(r.picks.filter(p=>p.dir==='short'));
-      view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2>Long positions and short candidates</h2>
-        <div class="recap">${longs.length} long companies and ${shorts.length} short candidates across ${r.picks.length} tradable listings. Every result met the selected criteria.${(r?.picks||[]).some(p=>p.market)?' Prices and 30 day history come from market data providers.':''}</div></section>`);
+      view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2>${esc(sdT('results.both'))}</h2>
+        <div class="recap">${esc(sdT('results.both.recap', {longs:longs.length, shorts:shorts.length, listings:r.picks.length}))}${(r?.picks||[]).some(p=>p.market)?` ${esc(sdT('results.prices'))}`:''}</div></section>`);
       view.insertAdjacentHTML('beforeend', basketSummary([...longs,...shorts], dir));
       if (longs.length) {
-        view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--up)">Long positions</h2></section>`);
+        view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--up)">${esc(sdT('results.both.long'))}</h2></section>`);
         appendPickCards(longs);
       }
       if (shorts.length) {
-        view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--down)">Short candidates</h2></section>`);
+        view.insertAdjacentHTML('beforeend', `<section class="block res-head"><h2 style="font-size:18px;color:var(--down)">${esc(sdT('results.both.short'))}</h2></section>`);
         appendPickCards(shorts);
       }
     } else if (r.breadth==='diversified' && r.picks.some(p=>p.strategy)) {
       renderStrategySections(r, dir);
     } else {
       const groups = groupByCompany(r.picks);
-      const heading = dir==='short'
-        ? `${groups.length} short candidate compan${groups.length===1?'y':'ies'}`
-        : `${groups.length} compan${groups.length===1?'y':'ies'} matched`;
-      const recap = dir==='short'
-        ? `${groups.length} companies across ${r.picks.length} tradable listings. Ranked by short fit. Every result met the selected criteria.`
-        : `${groups.length} companies across ${r.picks.length} tradable listings. Ranked by thesis fit. Every result met the selected criteria.`;
+      const heading = sdTn(dir==='short' ? 'results.shortMatched' : 'results.matched', groups.length);
+      const recap = sdT(dir==='short' ? 'results.recap.short' : 'results.recap.long', {companies:groups.length, listings:r.picks.length});
       view.insertAdjacentHTML('beforeend', resultsCard(groups, dir, heading, recap));
       appendPickCards(groups, {sortInBasket:true});
     }
@@ -2202,18 +2220,18 @@ function render(r){
   // Report export (spec §6, 2026-07-09): every completed run — including empty
   // and Polymarket-only ones — can be saved as a PDF recap.
   const rr=document.createElement('section'); rr.className='block report-row';
-  rr.innerHTML=`<div><div class="rr-t">Research report</div><div class="rr-sub">Download the sources, thesis, criteria and results as a PDF.</div></div>
-    <button class="btn-ghost" type="button">Download report (PDF)</button>`;
+  rr.innerHTML=`<div><div class="rr-t">${esc(sdT('results.report'))}</div><div class="rr-sub">${esc(sdT('results.report.text'))}</div></div>
+    <button class="btn-ghost" type="button">${esc(sdT('results.report.download'))}</button>`;
   rr.querySelector('button').addEventListener('click',()=>downloadReport(r));
   view.appendChild(rr);
   const editRow=document.createElement('section'); editRow.className='block report-row';
-  editRow.innerHTML=`<div><div class="rr-t">Change the thesis or criteria</div><div class="rr-sub">Return to the review card and run an updated screen.</div></div>
-    <div class="report-actions"><button class="btn-ghost" type="button" data-act="edit">Edit input</button></div>`;
+  editRow.innerHTML=`<div><div class="rr-t">${esc(sdT('results.edit'))}</div><div class="rr-sub">${esc(sdT('results.edit.text'))}</div></div>
+    <div class="report-actions"><button class="btn-ghost" type="button" data-act="edit">${esc(sdT('results.edit.button'))}</button></div>`;
   editRow.querySelector('[data-act="edit"]').addEventListener('click',()=>{
-    editRow.innerHTML=`<div><div class="rr-t">Want to download this list as a report?</div><div class="rr-sub">Save the current list before editing, or continue without a PDF.</div></div>
+    editRow.innerHTML=`<div><div class="rr-t">${esc(sdT('results.edit.ask'))}</div><div class="rr-sub">${esc(sdT('results.edit.ask.text'))}</div></div>
       <div class="report-actions">
-        <button class="btn-primary" type="button" data-act="yes">Yes</button>
-        <button class="btn-ghost" type="button" data-act="no">No</button>
+        <button class="btn-primary" type="button" data-act="yes">${esc(sdT('results.edit.yes'))}</button>
+        <button class="btn-ghost" type="button" data-act="no">${esc(sdT('results.edit.no'))}</button>
       </div>`;
     editRow.querySelector('[data-act="yes"]').addEventListener('click',()=>{
       downloadReport(r);
@@ -2223,10 +2241,12 @@ function render(r){
   });
   view.appendChild(editRow);
   const shortNote = (r.thesis?.direction === 'short' || r.thesis?.direction === 'both')
-    ? ' Short positions can produce unlimited losses and may involve borrow costs or short squeezes. This research does not model those risks.'
+    ? ` ${esc(sdT('results.footer.short'))}`
     : '';
+  const priceNote = (r?.picks||[]).some(p=>p.market) ? ` ${esc(sdT('results.footer.prices'))}` : '';
+  // The CoinGecko credit is the vendor's required attribution: kept verbatim in every language.
   const cgNote = showsCoinGecko(r) ? ` Crypto data provided by <a href="${CG_URL}" target="_blank" rel="noopener">CoinGecko</a>.` : '';
-  view.insertAdjacentHTML('beforeend', `<footer class="block">This is a research starting point, not a recommendation. SyntheTick does not assess valuation, timing or suitability.${shortNote}${pricesNote(r)}${cgNote} This is not financial advice.</footer>`);
+  view.insertAdjacentHTML('beforeend', `<footer class="block">${esc(sdT('results.footer'))}${shortNote}${priceNote}${cgNote} ${esc(sdT('results.footer.advice'))}</footer>`);
 }
 
 startBtn.addEventListener('click', async ()=>{
@@ -2273,6 +2293,22 @@ function applyTheme(t){
 applyTheme((()=>{ try{ return localStorage.getItem(THEME_KEY)||'dark' }catch{ return 'dark' } })());
 document.getElementById('themeDark')?.addEventListener('click', ()=>applyTheme('dark'));
 document.getElementById('themeLight')?.addEventListener('click', ()=>applyTheme('light'));
+
+// Language (issue #17): same pattern as the theme. Static nodes switch at
+// once; cards already rendered keep their language until they are drawn
+// again, and server status lines stay in English.
+function applyLang(l){
+  uiLang=safeLang(l);
+  try{ localStorage.setItem(LANG_KEY, uiLang) }catch{}
+  document.documentElement.lang=uiLang;
+  applyI18nNodes();
+  if(!rec || rec.state!=='recording') paintRecIdle();
+  document.getElementById('langEn')?.setAttribute('aria-pressed', uiLang==='en'?'true':'false');
+  document.getElementById('langIt')?.setAttribute('aria-pressed', uiLang==='it'?'true':'false');
+}
+applyLang(uiLang);
+document.getElementById('langEn')?.addEventListener('click', ()=>applyLang('en'));
+document.getElementById('langIt')?.addEventListener('click', ()=>applyLang('it'));
 
 const settingsBtn=document.getElementById('settingsBtn');
 const settingsPop=document.getElementById('settingsPop');

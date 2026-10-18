@@ -1,4 +1,5 @@
 import Script from 'next/script';
+import { t } from './i18n';
 
 // Dino, the FAQ helper mascot: a sauropod facing left, built from layered
 // radial gradients plus rim light and ambient occlusion for a soft 3D look.
@@ -282,10 +283,16 @@ export default function Home() {
         >
           <div className="sd-modal-card">
             <div className="sd-modal-head">
-              <h2 className="sd-modal-title" id="settingsTitle">
-                Settings
+              <h2 className="sd-modal-title" id="settingsTitle" data-i18n="settings.title">
+                {t('settings.title')}
               </h2>
-              <button className="sd-modal-x" id="settingsClose" type="button" aria-label="Close settings">
+              <button
+                className="sd-modal-x"
+                id="settingsClose"
+                type="button"
+                aria-label={t('settings.close')}
+                data-i18n-aria-label="settings.close"
+              >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M6 6l12 12" />
                   <path d="M18 6L6 18" />
@@ -300,15 +307,55 @@ export default function Home() {
                   </svg>
                 </span>
                 <div className="set-info">
-                  <h3 className="set-k">Appearance</h3>
-                  <p className="set-d">How SyntheTick looks. Dark is the default.</p>
+                  <h3 className="set-k" data-i18n="settings.appearance">
+                    {t('settings.appearance')}
+                  </h3>
+                  <p className="set-d" data-i18n="settings.appearance.text">
+                    {t('settings.appearance.text')}
+                  </p>
                 </div>
-                <div className="seg set-seg" role="group" aria-label="Theme">
-                  <button type="button" id="themeDark" aria-pressed="true">
-                    Dark
+                <div
+                  className="seg set-seg"
+                  role="group"
+                  aria-label={t('settings.theme')}
+                  data-i18n-aria-label="settings.theme"
+                >
+                  <button type="button" id="themeDark" aria-pressed="true" data-i18n="settings.theme.dark">
+                    {t('settings.theme.dark')}
                   </button>
-                  <button type="button" id="themeLight" aria-pressed="false">
-                    Light
+                  <button type="button" id="themeLight" aria-pressed="false" data-i18n="settings.theme.light">
+                    {t('settings.theme.light')}
+                  </button>
+                </div>
+              </div>
+              <div className="set-row">
+                <span className="set-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18" />
+                    <path d="M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9s1.3-6.5 3.8-9z" />
+                  </svg>
+                </span>
+                <div className="set-info">
+                  <h3 className="set-k" data-i18n="settings.language">
+                    {t('settings.language')}
+                  </h3>
+                  <p className="set-d" data-i18n="settings.language.text">
+                    {t('settings.language.text')}
+                  </p>
+                </div>
+                {/* Each label stays in its own language, so it can be found from either. */}
+                <div
+                  className="seg set-seg"
+                  role="group"
+                  aria-label={t('settings.language')}
+                  data-i18n-aria-label="settings.language"
+                >
+                  <button type="button" id="langEn" lang="en" aria-pressed="true">
+                    English
+                  </button>
+                  <button type="button" id="langIt" lang="it" aria-pressed="false">
+                    Italiano
                   </button>
                 </div>
               </div>
@@ -321,7 +368,9 @@ export default function Home() {
                   </svg>
                 </span>
                 <div className="set-info">
-                  <h3 className="set-k">Credits</h3>
+                  <h3 className="set-k" data-i18n="settings.credits">
+                    {t('settings.credits')}
+                  </h3>
                   <p className="set-d" id="creditsVal">
                     Usage tracking coming soon
                   </p>
@@ -341,17 +390,19 @@ export default function Home() {
                   </svg>
                 </span>
                 <div className="set-info">
-                  <h3 className="set-k">Account</h3>
+                  <h3 className="set-k" data-i18n="settings.account">
+                    {t('settings.account')}
+                  </h3>
                   <p className="set-d" id="acctLine">
                     Manage your SyntheTick session.
                   </p>
                 </div>
                 <div className="set-actions">
-                  <button className="sp-btn" id="signOutBtn" type="button" hidden>
-                    Sign out
+                  <button className="sp-btn" id="signOutBtn" type="button" hidden data-i18n="settings.signOut">
+                    {t('settings.signOut')}
                   </button>
-                  <a className="sp-btn" id="adminLink" href="/admin" hidden>
-                    Admin panel
+                  <a className="sp-btn" id="adminLink" href="/admin" hidden data-i18n="settings.admin">
+                    {t('settings.admin')}
                   </a>
                 </div>
               </div>
@@ -363,17 +414,19 @@ export default function Home() {
                   </svg>
                 </span>
                 <div className="set-info">
-                  <h3 className="set-k">X account</h3>
+                  <h3 className="set-k" data-i18n="settings.x">
+                    {t('settings.x')}
+                  </h3>
                   <p className="set-d" id="xLine">
                     Link your X account to use the SyntheTick bot on X.
                   </p>
                 </div>
                 <div className="set-actions">
-                  <button className="sp-btn" id="xConnectBtn" type="button">
-                    Connect X
+                  <button className="sp-btn" id="xConnectBtn" type="button" data-i18n="settings.x.connect">
+                    {t('settings.x.connect')}
                   </button>
-                  <button className="sp-btn" id="xDisconnectBtn" type="button" hidden>
-                    Disconnect
+                  <button className="sp-btn" id="xDisconnectBtn" type="button" hidden data-i18n="settings.x.disconnect">
+                    {t('settings.x.disconnect')}
                   </button>
                 </div>
               </div>
@@ -387,10 +440,11 @@ export default function Home() {
                   </svg>
                 </span>
                 <div className="set-info">
-                  <h3 className="set-k">Terms and Conditions</h3>
-                  <p className="set-d">
-                    How SyntheTick may be used. SyntheTick is a research tool, not financial
-                    advice.
+                  <h3 className="set-k" data-i18n="settings.terms">
+                    {t('settings.terms')}
+                  </h3>
+                  <p className="set-d" data-i18n="settings.terms.text">
+                    {t('settings.terms.text')}
                   </p>
                 </div>
                 <svg className="set-chev" viewBox="0 0 24 24" aria-hidden="true">
@@ -519,19 +573,18 @@ export default function Home() {
         <main className="feed empty" id="feed">
           <section className="block composer" id="composer">
             <div className="lead">
-              <h2>Your thesis. The assets that match it.</h2>
-              <p>
-                Convinced AI or Ethereum will reshape entire industries? Turn that conviction into a screened
-                list of public and pre-IPO stocks, ETFs, crypto and Polymarket bets.
-              </p>
+              <h2 data-i18n="composer.title">{t('composer.title')}</h2>
+              <p data-i18n="composer.intro">{t('composer.intro')}</p>
             </div>
 
             <div className="panel">
               <div className="chat-composer">
                 <textarea
                   id="doc"
-                  aria-label="Investment thesis"
-                  placeholder="Add a thesis, an article, a link, a note or a voice recording. SyntheTick reads the investment case and your constraints, screens the market and checks every result against your criteria."
+                  aria-label={t('composer.input.label')}
+                  data-i18n-aria-label="composer.input.label"
+                  placeholder={t('composer.input.placeholder')}
+                  data-i18n-placeholder="composer.input.placeholder"
                 />
                 <div className="composer-toolbar">
                   <div className="composer-left">
@@ -546,10 +599,12 @@ export default function Home() {
                         className="icon-btn add-trigger"
                         id="addMenuBtn"
                         type="button"
-                        aria-label="Add files or links"
+                        aria-label={t('composer.add')}
+                        data-i18n-aria-label="composer.add"
                         aria-haspopup="menu"
                         aria-expanded="false"
-                        title="Add files or links"
+                        title={t('composer.add')}
+                        data-i18n-title="composer.add"
                       >
                         +
                       </button>
@@ -559,7 +614,8 @@ export default function Home() {
                           id="addFileBtn"
                           type="button"
                           role="menuitem"
-                          aria-label="Add file"
+                          aria-label={t('composer.add.file.label')}
+                          data-i18n-aria-label="composer.add.file.label"
                         >
                           <span className="menu-ico" aria-hidden="true">
                             <svg viewBox="0 0 24 24">
@@ -569,14 +625,15 @@ export default function Home() {
                               <path d="m9 15 3 3 3-3" />
                             </svg>
                           </span>
-                          <span>File</span>
+                          <span data-i18n="composer.add.file">{t('composer.add.file')}</span>
                         </button>
                         <button
                           className="menu-item"
                           id="addLinkBtn"
                           type="button"
                           role="menuitem"
-                          aria-label="Add link"
+                          aria-label={t('composer.add.link.label')}
+                          data-i18n-aria-label="composer.add.link.label"
                         >
                           <span className="menu-ico" aria-hidden="true">
                             <svg viewBox="0 0 24 24">
@@ -584,7 +641,7 @@ export default function Home() {
                               <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
                             </svg>
                           </span>
-                          <span>Link</span>
+                          <span data-i18n="composer.add.link">{t('composer.add.link')}</span>
                         </button>
                       </div>
                     </div>
@@ -592,8 +649,8 @@ export default function Home() {
                       className="icon-btn mic-btn"
                       id="recBtn"
                       type="button"
-                      aria-label="Record a voice note"
-                      title="Record a voice note"
+                      aria-label={t('composer.record')}
+                      title={t('composer.record')}
                     >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
@@ -605,8 +662,10 @@ export default function Home() {
                       className="icon-btn dice-btn"
                       id="randomBtn"
                       type="button"
-                      aria-label="Try a random thesis idea"
-                      title="Try a random thesis idea"
+                      aria-label={t('composer.random')}
+                      data-i18n-aria-label="composer.random"
+                      title={t('composer.random')}
+                      data-i18n-title="composer.random"
                     >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" />
@@ -626,10 +685,12 @@ export default function Home() {
                         className="model-trigger"
                         id="modelBtn"
                         type="button"
-                        aria-label="Choose a model"
+                        aria-label={t('composer.model.choose')}
+                        data-i18n-aria-label="composer.model.choose"
                         aria-haspopup="menu"
                         aria-expanded="false"
-                        title="Choose a model"
+                        title={t('composer.model.choose')}
+                        data-i18n-title="composer.model.choose"
                       >
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M12 3.5 13.8 9 19.5 11 13.8 13 12 18.5 10.2 13 4.5 11 10.2 9Z" />
@@ -640,7 +701,9 @@ export default function Home() {
                         </svg>
                       </button>
                       <div className="model-menu" id="modelMenu" role="menu" hidden>
-                        <div className="model-menu-label">Model</div>
+                        <div className="model-menu-label" data-i18n="composer.model.label">
+                          {t('composer.model.label')}
+                        </div>
                         <button
                           className="model-item is-current"
                           id="modelCurrent"
@@ -655,23 +718,30 @@ export default function Home() {
                         </button>
                         <button className="model-item" type="button" role="menuitemradio" aria-checked="false" disabled>
                           <span>OpenAI GPT 5</span>
-                          <span className="soon">Soon</span>
+                          <span className="soon" data-i18n="composer.model.soon">
+                            {t('composer.model.soon')}
+                          </span>
                         </button>
                         <button className="model-item" type="button" role="menuitemradio" aria-checked="false" disabled>
                           <span>Google Gemini 2.5 Pro</span>
-                          <span className="soon">Soon</span>
+                          <span className="soon" data-i18n="composer.model.soon">
+                            {t('composer.model.soon')}
+                          </span>
                         </button>
                         <button className="model-item" type="button" role="menuitemradio" aria-checked="false" disabled>
                           <span>xAI Grok 4</span>
-                          <span className="soon">Soon</span>
+                          <span className="soon" data-i18n="composer.model.soon">
+                            {t('composer.model.soon')}
+                          </span>
                         </button>
                         <button className="model-item" type="button" role="menuitemradio" aria-checked="false" disabled>
                           <span>DeepSeek V3</span>
-                          <span className="soon">Soon</span>
+                          <span className="soon" data-i18n="composer.model.soon">
+                            {t('composer.model.soon')}
+                          </span>
                         </button>
-                        <div className="model-note">
-                          Model choice is coming soon. Every research runs on Claude Sonnet 4.6 for
-                          now.
+                        <div className="model-note" data-i18n="composer.model.note">
+                          {t('composer.model.note')}
                         </div>
                       </div>
                     </div>
@@ -680,8 +750,10 @@ export default function Home() {
                       id="startBtn"
                       type="button"
                       disabled
-                      aria-label="Start research"
-                      title="Start research"
+                      aria-label={t('composer.start')}
+                      data-i18n-aria-label="composer.start"
+                      title={t('composer.start')}
+                      data-i18n-title="composer.start"
                     >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 19V5" />
@@ -698,11 +770,13 @@ export default function Home() {
                     id="linkUrl"
                     className="link-input"
                     type="text"
-                    aria-label="Link to add"
-                    placeholder="Paste an X post, YouTube video or article link"
+                    aria-label={t('composer.link.label')}
+                    data-i18n-aria-label="composer.link.label"
+                    placeholder={t('composer.link.placeholder')}
+                    data-i18n-placeholder="composer.link.placeholder"
                   />
-                  <button className="pdf-btn" id="linkLoad" type="button">
-                    Load
+                  <button className="pdf-btn" id="linkLoad" type="button" data-i18n="composer.link.load">
+                    {t('composer.link.load')}
                   </button>
                 </div>
               </div>
@@ -711,16 +785,16 @@ export default function Home() {
             </div>
 
             <div className="ideas">
-              <div className="ideas-label">Ideas for you</div>
+              <div className="ideas-label" data-i18n="composer.ideas">
+                {t('composer.ideas')}
+              </div>
               <div className="idea-list" id="ideaList" />
             </div>
 
             <div className="home-disclaimer">
-              Disclaimer: SyntheTick is a research and discovery tool. Nothing here is financial
-              advice, a recommendation or an offer to buy or sell any asset. Always do your own
-              analysis before investing. Read more on the{' '}
-              <button className="disc-terms" id="discTerms" type="button">
-                Terms &amp; Conditions
+              <span data-i18n="composer.disclaimer">{t('composer.disclaimer')}</span>{' '}
+              <button className="disc-terms" id="discTerms" type="button" data-i18n="composer.disclaimer.terms">
+                {t('composer.disclaimer.terms')}
               </button>
               .
             </div>

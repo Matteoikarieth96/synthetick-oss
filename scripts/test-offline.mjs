@@ -32,6 +32,9 @@ const suites = [
   // to end, prompt hygiene, universe payload, self-hosted pdf.js, frontend fixes.
   'runtime/test-display-policy-offline.ts',
   'runtime/test-proxy-and-hygiene-offline.ts',
+  // UI string catalogs (issue #17): same keys in every language, copy rules,
+  // every key the UI names exists, safe English fallback in the client.
+  'runtime/test-i18n-offline.ts',
   // sail-agent: runs on its own sources only (no viem/Sailor imports), so it
   // needs no install inside sail-agent/.
   'sail-agent/test/offline.test.ts',
